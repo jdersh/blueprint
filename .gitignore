@@ -4,3 +4,4 @@ Vagrantfile
 .DS_Store
 gitignore-*
 build/config/transforms_available.json
+.arcconfig
