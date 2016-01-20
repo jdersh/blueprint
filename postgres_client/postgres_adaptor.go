@@ -9,7 +9,7 @@ import (
 
 	"errors"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 type PostgresBackendObject struct {
@@ -23,14 +23,8 @@ type eventRow struct {
 	eventPayload string
 }
 
-func BuildPostgresBackend(blueprintDBURL, tableName string) (PostgresBackendObject, error) {
-
-	db, err := sql.Open("postgres", blueprintDBURL)
-
-	if err != nil {
-		return PostgresBackendObject{}, errors.New("Could not open connection to DB: " + err.Error())
-	}
-	err = db.Ping()
+func BuildPostgresBackend(db *sql.DB, tableName string) (PostgresBackendObject, error) {
+	err := db.Ping()
 	if err != nil {
 		return PostgresBackendObject{}, errors.New("Could not check link to DB: " + err.Error())
 	}
@@ -54,7 +48,7 @@ func (pg *PostgresBackendObject) GetEvents() ([]schema.Event, error) {
 
 		err := json.Unmarshal(jsonEvent, &event)
 		if err != nil {
-			return []schema.Event{}, errors.New("Unable to unmarshal json data into Events. Possibly incorrect json formatting.")
+			return []schema.Event{}, errors.New("Unable to unmarshal json data into Events. Possibly incorrect json formatting: " + string(jsonEvent))
 		}
 
 		events = append(events, event)
@@ -108,23 +102,25 @@ func (pg *PostgresBackendObject) UpdateEvent(event schema.Event) error {
 }
 
 func (pg *PostgresBackendObject) getItems() ([][]byte, error) {
-	query := `select distinct on (event_name)
+	query := fmt.Sprintf(`select distinct on (event_name)
                     event_name,
                     event_version,
                     event_payload
-                 from ` + pg.tableName + ` 
-                 order by event_name, event_version desc;`
+                 from %s 
+                 order by event_name, event_version desc;`, pq.QuoteIdentifier(pg.tableName))
 
 	rawEventRows, err := pg.connection.Query(query)
 	if err != nil {
 		return nil, errors.New("Could not get items from db: " + err.Error())
 	}
+
 	defer rawEventRows.Close()
 
-	var stringEventRow eventRow
 	var byteEvents [][]byte
 
 	for rawEventRows.Next() {
+		var stringEventRow eventRow
+
 		err := rawEventRows.Scan(
 			&stringEventRow.eventName,
 			&stringEventRow.eventVersion,
@@ -142,12 +138,15 @@ func (pg *PostgresBackendObject) getItems() ([][]byte, error) {
 }
 
 func (pg *PostgresBackendObject) getNewestItem(eventName string) ([]byte, error) {
-	query := `select event_name, event_version, event_payload from ` + pg.tableName + ` 
-                where event_name = '` + eventName + `  
-                order by event_version desc limit 1;`
+	query := fmt.Sprintf(`select event_name, event_version, event_payload from %s
+                where event_name = $1
+                order by event_version desc limit 1;`, pq.QuoteIdentifier(pg.tableName))
 
 	var stringEventRow eventRow
-	err := pg.connection.QueryRow(query).Scan(&stringEventRow)
+	err := pg.connection.QueryRow(query, eventName).Scan(
+		&stringEventRow.eventName,
+		&stringEventRow.eventVersion,
+		&stringEventRow.eventPayload)
 
 	switch {
 	case err == sql.ErrNoRows:
@@ -164,12 +163,15 @@ func (pg *PostgresBackendObject) getNewestItem(eventName string) ([]byte, error)
 }
 
 func (pg *PostgresBackendObject) getSpecificItem(eventName string, eventVersion int) ([]byte, error) {
-	query := `select event_name, event_version, event_payload from ` + pg.tableName + ` 
-                where event_name = '` + eventName + `' and event_version = ` + string(eventVersion) + ` 
-                order by event_version desc limit 1;`
+	query := fmt.Sprintf(`select event_name, event_version, event_payload from %s
+                where event_name = $1 and event_version = $2
+                order by event_version desc limit 1;`, pq.QuoteIdentifier(pg.tableName))
 
 	var stringEventRow eventRow
-	err := pg.connection.QueryRow(query).Scan(&stringEventRow)
+	err := pg.connection.QueryRow(query, eventName, eventVersion).Scan(
+		&stringEventRow.eventName,
+		&stringEventRow.eventVersion,
+		&stringEventRow.eventPayload)
 
 	switch {
 	case err == sql.ErrNoRows:
@@ -182,9 +184,9 @@ func (pg *PostgresBackendObject) getSpecificItem(eventName string, eventVersion 
 }
 
 func (pg *PostgresBackendObject) putItem(eventName string, eventVersion int, eventPayload []byte) error {
-	query := fmt.Sprintf(`insert into dev_event_schemas values ('%q', %d, '%q'); `, eventName, eventVersion, eventPayload)
+	query := fmt.Sprintf(`insert into %s values ($1, $2, $3);`, pq.QuoteIdentifier(pg.tableName))
 
-	_, err := pg.connection.Exec(query)
+	_, err := pg.connection.Exec(query, eventName, eventVersion, string(eventPayload))
 	if err != nil {
 		return errors.New("Could not add new event into DB: " + err.Error())
 	}
@@ -193,10 +195,10 @@ func (pg *PostgresBackendObject) putItem(eventName string, eventVersion int, eve
 }
 
 func (pg *PostgresBackendObject) createTestTable() error {
-	query := fmt.Sprintf(`create table %q (
+	query := fmt.Sprintf(`create table %s (
                             event_name varchar(127) not null, 
                             event_version integer not null, 
-                            event_payload JSONB);`, pg.tableName)
+                            event_payload JSONB);`, pq.QuoteIdentifier(pg.tableName))
 
 	_, err := pg.connection.Exec(query)
 	if err != nil {
@@ -207,7 +209,7 @@ func (pg *PostgresBackendObject) createTestTable() error {
 }
 
 func (pg *PostgresBackendObject) dropTestTable() error {
-	query := fmt.Sprintf(`drop table %q `, pg.tableName)
+	query := fmt.Sprintf(`drop table %s;`, pq.QuoteIdentifier(pg.tableName))
 
 	_, err := pg.connection.Exec(query)
 	if err != nil {

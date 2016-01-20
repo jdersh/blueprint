@@ -11,10 +11,10 @@ type MockPostgresBackendObject struct {
 	tableName  string
 }
 
-func BuildMockPostgresBackend(blueprintDBURL, tableName string) (MockPostgresBackendObject, error) {
+func BuildMockPostgresBackend(db *sql.DB, tableName string) (MockPostgresBackendObject, error) {
 
 	return MockPostgresBackendObject{
-		connection: nil,
+		connection: db,
 		tableName:  tableName,
 	}, nil
 }
