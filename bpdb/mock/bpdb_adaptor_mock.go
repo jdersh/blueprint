@@ -1,4 +1,4 @@
-package bpdb
+package mock
 
 import (
 	"database/sql"
@@ -12,7 +12,6 @@ type MockPostgresBackendObject struct {
 }
 
 func BuildMockPostgresBackend(db *sql.DB, tableName string) (MockPostgresBackendObject, error) {
-
 	return MockPostgresBackendObject{
 		connection: db,
 		tableName:  tableName,
@@ -20,22 +19,27 @@ func BuildMockPostgresBackend(db *sql.DB, tableName string) (MockPostgresBackend
 }
 
 func (mpg *MockPostgresBackendObject) GetEvents() ([]schema.Event, error) {
-	return nil, nil
+	return []schema.Event{
+		schema.MakeNewEvent("event0", 0),
+		schema.MakeNewEvent("event0", 1),
+		schema.MakeNewEvent("event0", 2),
+		schema.MakeNewEvent("event1", 0),
+		schema.MakeNewEvent("event1", 1),
+		schema.MakeNewEvent("event1", 2),
+		schema.MakeNewEvent("event2", 0),
+		schema.MakeNewEvent("event2", 1),
+		schema.MakeNewEvent("event2", 2),
+	}, nil
 }
 
 func (mpg *MockPostgresBackendObject) GetNewestEvent(eventName string) (schema.Event, error) {
-	var event schema.Event
-
-	return event, nil
+	return schema.MakeNewEvent(eventName, 10), nil
 }
 
 func (mpg *MockPostgresBackendObject) GetSpecificEvent(eventName string, eventVersion int) (schema.Event, error) {
-	var event schema.Event
-
-	return event, nil
+	return schema.MakeNewEvent(eventName, eventVersion), nil
 }
 
 func (mpg *MockPostgresBackendObject) UpdateEvent(event schema.Event) error {
-
 	return nil
 }
