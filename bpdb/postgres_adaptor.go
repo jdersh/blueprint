@@ -1,4 +1,4 @@
-package PostgresClient
+package bpdb
 
 import (
 	"database/sql"
@@ -6,8 +6,6 @@ import (
 	"fmt"
 
 	"github.com/twitchscience/scoop_protocol/schema"
-
-	"errors"
 
 	"github.com/lib/pq"
 )
@@ -26,7 +24,7 @@ type eventRow struct {
 func BuildPostgresBackend(db *sql.DB, tableName string) (PostgresBackendObject, error) {
 	err := db.Ping()
 	if err != nil {
-		return PostgresBackendObject{}, errors.New("Could not check link to DB: " + err.Error())
+		return PostgresBackendObject{}, fmt.Errorf("Error %v establishing connection to FB", err)
 	}
 
 	return PostgresBackendObject{
@@ -38,17 +36,18 @@ func BuildPostgresBackend(db *sql.DB, tableName string) (PostgresBackendObject, 
 func (pg *PostgresBackendObject) GetEvents() ([]schema.Event, error) {
 	jsonEvents, err := pg.getItems()
 	if err != nil {
-		return []schema.Event{}, errors.New("Failed to get events from database: " + err.Error())
+		return []schema.Event{}, fmt.Errorf("Error %v getting events from database", err)
 	}
 
 	var events []schema.Event
-	var event schema.Event
 
 	for _, jsonEvent := range jsonEvents {
 
+		var event schema.Event
+
 		err := json.Unmarshal(jsonEvent, &event)
 		if err != nil {
-			return []schema.Event{}, errors.New("Unable to unmarshal json data into Events. Possibly incorrect json formatting: " + string(jsonEvent))
+			return []schema.Event{}, fmt.Errorf("Error %v unmarshalling json: %s", err, string(jsonEvent))
 		}
 
 		events = append(events, event)
@@ -60,13 +59,13 @@ func (pg *PostgresBackendObject) GetEvents() ([]schema.Event, error) {
 func (pg *PostgresBackendObject) GetNewestEvent(eventName string) (schema.Event, error) {
 	jsonEvent, err := pg.getNewestItem(eventName)
 	if err != nil {
-		return schema.Event{}, errors.New("Failed to get specific event from database: " + err.Error())
+		return schema.Event{}, fmt.Errorf("Error %v getting newest event from DB", err)
 	}
 
 	var event schema.Event
 	err = json.Unmarshal(jsonEvent, &event)
 	if err != nil {
-		return schema.Event{}, errors.New("Unable to unmarshal json data into Event. Possibly incorrect json formatting.")
+		return schema.Event{}, fmt.Errorf("Error %v unmarshalling newest event json: %s ", err, string(jsonEvent))
 	}
 	return event, nil
 }
@@ -74,13 +73,13 @@ func (pg *PostgresBackendObject) GetNewestEvent(eventName string) (schema.Event,
 func (pg *PostgresBackendObject) GetSpecificEvent(eventName string, eventVersion int) (schema.Event, error) {
 	jsonEvent, err := pg.getSpecificItem(eventName, eventVersion)
 	if err != nil {
-		return schema.Event{}, errors.New("Failed to get specific event from database: " + err.Error())
+		return schema.Event{}, fmt.Errorf("Error %v getting specific event from DB", err)
 	}
 
 	var event schema.Event
 	err = json.Unmarshal(jsonEvent, &event)
 	if err != nil {
-		return schema.Event{}, errors.New("Unable to unmarshal json data into Event. Possibly incorrect json formatting.")
+		return schema.Event{}, fmt.Errorf("Error %v unmarshalling specific event json: %s", err, string(jsonEvent))
 	}
 	return event, nil
 }
@@ -90,28 +89,30 @@ func (pg *PostgresBackendObject) UpdateEvent(event schema.Event) error {
 	eventVersion := event.Version
 	eventPayload, err := json.Marshal(event)
 	if err != nil {
-		return errors.New("Unable to marshal event as json.")
+		return fmt.Errorf("Error %v marshalling event", err)
 	}
 
 	err = pg.putItem(eventName, eventVersion, eventPayload)
 	if err != nil {
-		return errors.New("An error occured trying to load the event into the DB: " + err.Error())
+		return fmt.Errorf("Error %v loading event into DB", err)
 	}
 
 	return nil
 }
 
 func (pg *PostgresBackendObject) getItems() ([][]byte, error) {
-	query := fmt.Sprintf(`select distinct on (event_name)
-                    event_name,
-                    event_version,
-                    event_payload
-                 from %s 
-                 order by event_name, event_version desc;`, pq.QuoteIdentifier(pg.tableName))
+	//'distinct' removes all duplicate rows from the result set, on the column or group of columns it is called on.
+	//'order by' lets you chose which row will be kepy and which rows will be removed.
+	query := fmt.Sprintf(`	select distinct on (event_name)
+                    			event_name,
+                    			event_version,
+                    			event_payload
+                 			from %s 
+                 			order by event_name, event_version desc;`, pq.QuoteIdentifier(pg.tableName))
 
 	rawEventRows, err := pg.connection.Query(query)
 	if err != nil {
-		return nil, errors.New("Could not get items from db: " + err.Error())
+		return nil, fmt.Errorf("Error %v querying newest items from DB", err)
 	}
 
 	defer rawEventRows.Close()
@@ -127,7 +128,7 @@ func (pg *PostgresBackendObject) getItems() ([][]byte, error) {
 			&stringEventRow.eventPayload)
 
 		if err != nil {
-			return nil, errors.New("Items from DB were not what was expected: " + err.Error())
+			return nil, fmt.Errorf("Error %v storing rows from DB", err)
 		}
 
 		byteEventPayload := []byte(stringEventRow.eventPayload)
@@ -152,11 +153,11 @@ func (pg *PostgresBackendObject) getNewestItem(eventName string) ([]byte, error)
 	case err == sql.ErrNoRows:
 		temp, err := json.Marshal(schema.MakeNewEvent(eventName, 1))
 		if err != nil {
-			return nil, errors.New("Could not create json for new event: " + err.Error())
+			return nil, fmt.Errorf("Error %v marshalling json for new event", err)
 		}
 		return temp, nil
 	case err != nil:
-		return nil, errors.New("Problem occured querying event from db: " + err.Error())
+		return nil, fmt.Errorf("Error %v querying newest item from DB", err)
 	}
 
 	return []byte(stringEventRow.eventPayload), nil
@@ -175,9 +176,9 @@ func (pg *PostgresBackendObject) getSpecificItem(eventName string, eventVersion 
 
 	switch {
 	case err == sql.ErrNoRows:
-		return nil, errors.New("Event with specific version does not exist in DB")
+		return nil, fmt.Errorf("Specific item does not exist in DB: %v", err)
 	case err != nil:
-		return nil, errors.New("Problem occured querying event from db: " + err.Error())
+		return nil, fmt.Errorf("Error %v querying specific item from DB", err)
 	}
 
 	return []byte(stringEventRow.eventPayload), nil
@@ -188,32 +189,7 @@ func (pg *PostgresBackendObject) putItem(eventName string, eventVersion int, eve
 
 	_, err := pg.connection.Exec(query, eventName, eventVersion, string(eventPayload))
 	if err != nil {
-		return errors.New("Could not add new event into DB: " + err.Error())
-	}
-
-	return nil
-}
-
-func (pg *PostgresBackendObject) createTestTable() error {
-	query := fmt.Sprintf(`create table %s (
-                            event_name varchar(127) not null, 
-                            event_version integer not null, 
-                            event_payload JSONB);`, pq.QuoteIdentifier(pg.tableName))
-
-	_, err := pg.connection.Exec(query)
-	if err != nil {
-		return errors.New("Could not add table to DB " + err.Error())
-	}
-
-	return nil
-}
-
-func (pg *PostgresBackendObject) dropTestTable() error {
-	query := fmt.Sprintf(`drop table %s;`, pq.QuoteIdentifier(pg.tableName))
-
-	_, err := pg.connection.Exec(query)
-	if err != nil {
-		return errors.New("Could not drop table from DB " + err.Error())
+		return fmt.Errorf("Error %v executing insert into DB", err)
 	}
 
 	return nil
