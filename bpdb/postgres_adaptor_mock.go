@@ -1,4 +1,4 @@
-package PostgresClient
+package bpdb
 
 import (
 	"database/sql"
@@ -20,9 +20,7 @@ func BuildMockPostgresBackend(db *sql.DB, tableName string) (MockPostgresBackend
 }
 
 func (mpg *MockPostgresBackendObject) GetEvents() ([]schema.Event, error) {
-	var events []schema.Event
-
-	return events, nil
+	return nil, nil
 }
 
 func (mpg *MockPostgresBackendObject) GetNewestEvent(eventName string) (schema.Event, error) {
