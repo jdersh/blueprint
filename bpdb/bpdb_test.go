@@ -29,7 +29,7 @@ func setupTestDB() (PostgresBackendObject, error) {
 		return PostgresBackendObject{}, fmt.Errorf("Could not extablish connection to DB: %v", err)
 	}
 
-	pgBackend, err := BuildPostgresBackend(db, testEventTable)
+	pgBackend, err := NewPostgresBackend(db, testEventTable)
 	if err != nil {
 		return PostgresBackendObject{}, fmt.Errorf("Could not extablish connection to DB and store to postgres object: %v", err)
 	}
@@ -48,7 +48,7 @@ func setupTestDB() (PostgresBackendObject, error) {
 
 	pgBackend.createTestTable()
 	for _, testEvent := range testEvents {
-		err := pgBackend.UpdateEvent(testEvent)
+		err := pgBackend.PutEvent(testEvent)
 		if err != nil {
 			return PostgresBackendObject{}, fmt.Errorf("Could not add test events to DB: %v", err)
 		}
@@ -65,7 +65,7 @@ func DeepEqualChecker(expectedTestEvent, actualTestEvent schema.Event, t *testin
 	}
 }
 
-func TestGetEvents(t *testing.T) {
+func TestEvents(t *testing.T) {
 	flag.Parse()
 
 	if *postgresMockStatus {
@@ -79,7 +79,7 @@ func TestGetEvents(t *testing.T) {
 	defer pgBackend.connection.Close()
 	defer pgBackend.dropTestTable()
 
-	newestTestEvents, err := pgBackend.GetEvents()
+	newestTestEvents, err := pgBackend.Events()
 	if err != nil {
 		t.Fatalf("Could not get events from db: %s", err)
 	}
@@ -98,7 +98,7 @@ func TestGetEvents(t *testing.T) {
 	}
 }
 
-func TestGetNewestEvent(t *testing.T) {
+func TestNewestEvent(t *testing.T) {
 	flag.Parse()
 
 	if *postgresMockStatus {
@@ -112,7 +112,7 @@ func TestGetNewestEvent(t *testing.T) {
 	defer pgBackend.connection.Close()
 	defer pgBackend.dropTestTable()
 
-	newestTestEvent, err := pgBackend.GetNewestEvent("event2")
+	newestTestEvent, err := pgBackend.NewestEvent("event2")
 	if err != nil {
 		t.Fatalf("Could not get event from db: %s", err)
 	}
@@ -121,7 +121,7 @@ func TestGetNewestEvent(t *testing.T) {
 
 	DeepEqualChecker(expectedTestEvent, newestTestEvent, t)
 
-	newestTestEvent, err = pgBackend.GetNewestEvent("event3")
+	newestTestEvent, err = pgBackend.NewestEvent("event3")
 	if err != nil {
 		t.Fatalf("Could not get event from db: %s", err)
 	}
@@ -131,7 +131,7 @@ func TestGetNewestEvent(t *testing.T) {
 	DeepEqualChecker(expectedTestEvent, newestTestEvent, t)
 }
 
-func TestGetSpecificEventGeneric(t *testing.T) {
+func TestEventVersionGeneric(t *testing.T) {
 	flag.Parse()
 
 	if *postgresMockStatus {
@@ -145,7 +145,7 @@ func TestGetSpecificEventGeneric(t *testing.T) {
 	defer pgBackend.connection.Close()
 	defer pgBackend.dropTestTable()
 
-	specificTestEvent, err := pgBackend.GetSpecificEvent("event2", 1)
+	specificTestEvent, err := pgBackend.EventVersion("event2", 1)
 	if err != nil {
 		t.Fatalf("Could not get event from db: %s", err)
 	}
@@ -155,7 +155,7 @@ func TestGetSpecificEventGeneric(t *testing.T) {
 	DeepEqualChecker(expectedTestEvent, specificTestEvent, t)
 }
 
-func TestGetSpecificEventExistance(t *testing.T) {
+func TestEventVersionExistance(t *testing.T) {
 	flag.Parse()
 
 	if *postgresMockStatus {
@@ -169,14 +169,14 @@ func TestGetSpecificEventExistance(t *testing.T) {
 	defer pgBackend.connection.Close()
 	defer pgBackend.dropTestTable()
 
-	specificTestEvent, err := pgBackend.GetSpecificEvent("event3", 1)
+	specificTestEvent, err := pgBackend.EventVersion("event3", 1)
 	if err == nil {
 		t.Errorf("Should have errored due to event not existing but did not")
 		t.Logf("Unexpected response: %+v", specificTestEvent)
 	}
 }
 
-func TestGetSpecificEventVersion(t *testing.T) {
+func TestEventVersionVersion(t *testing.T) {
 	flag.Parse()
 
 	if *postgresMockStatus {
@@ -190,7 +190,7 @@ func TestGetSpecificEventVersion(t *testing.T) {
 	defer pgBackend.connection.Close()
 	defer pgBackend.dropTestTable()
 
-	specificTestEvent, err := pgBackend.GetSpecificEvent("event2", 3)
+	specificTestEvent, err := pgBackend.EventVersion("event2", 3)
 	if err == nil {
 		t.Errorf("Should have errored due to event version not existing but did not")
 		t.Logf("Unexpected response: %+v", specificTestEvent)
@@ -206,7 +206,7 @@ func eventStringGenerator(event schema.Event, t *testing.T) string {
 	return string(jsonEvent)
 }
 
-func TestMockGetEvents(t *testing.T) {
+func TestMockEvents(t *testing.T) {
 	flag.Parse()
 
 	db, err := sqlmock.New()
@@ -215,7 +215,7 @@ func TestMockGetEvents(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
-	mockBackend, err := BuildPostgresBackend(db, testEventTable)
+	mockBackend, err := NewPostgresBackend(db, testEventTable)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when creating backend object and tested with ping", err)
 	}
@@ -230,7 +230,7 @@ func TestMockGetEvents(t *testing.T) {
 
 	sqlmock.ExpectQuery("select").WillReturnRows(mockRows)
 
-	allMockEvents, err := mockBackend.GetEvents()
+	allMockEvents, err := mockBackend.Events()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when getting all newest events", err)
 	}
@@ -245,7 +245,7 @@ func TestMockGetEvents(t *testing.T) {
 
 }
 
-func TestMockGetNewestEvent(t *testing.T) {
+func TestMockNewestEvent(t *testing.T) {
 	flag.Parse()
 
 	db, err := sqlmock.New()
@@ -254,7 +254,7 @@ func TestMockGetNewestEvent(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
-	mockBackend, err := BuildPostgresBackend(db, testEventTable)
+	mockBackend, err := NewPostgresBackend(db, testEventTable)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when creating backend object and tested with ping", err)
 	}
@@ -267,7 +267,7 @@ func TestMockGetNewestEvent(t *testing.T) {
 
 	sqlmock.ExpectQuery("select").WillReturnRows(mockRows)
 
-	mockEvent, err := mockBackend.GetNewestEvent("event0")
+	mockEvent, err := mockBackend.NewestEvent("event0")
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when getting newest event", err)
 	}
@@ -281,7 +281,7 @@ func TestMockGetNewestEvent(t *testing.T) {
 	}
 
 	sqlmock.ExpectQuery("select").WillReturnError(sql.ErrNoRows)
-	mockEvent, err = mockBackend.GetNewestEvent("event3")
+	mockEvent, err = mockBackend.NewestEvent("event3")
 
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when getting newest event that doesn't actually exist", err)
@@ -296,7 +296,7 @@ func TestMockGetNewestEvent(t *testing.T) {
 	}
 }
 
-func TestMockGetSpecificEvent(t *testing.T) {
+func TestMockEventVersion(t *testing.T) {
 	flag.Parse()
 
 	db, err := sqlmock.New()
@@ -305,7 +305,7 @@ func TestMockGetSpecificEvent(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
-	mockBackend, err := BuildPostgresBackend(db, testEventTable)
+	mockBackend, err := NewPostgresBackend(db, testEventTable)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when creating backend object and tested with ping", err)
 	}
@@ -318,7 +318,7 @@ func TestMockGetSpecificEvent(t *testing.T) {
 
 	sqlmock.ExpectQuery("select").WillReturnRows(mockRows)
 
-	mockEvent, err := mockBackend.GetSpecificEvent("event0", 1)
+	mockEvent, err := mockBackend.EventVersion("event0", 1)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when getting newest event", err)
 	}
@@ -332,14 +332,14 @@ func TestMockGetSpecificEvent(t *testing.T) {
 	}
 
 	sqlmock.ExpectQuery("select").WillReturnError(sql.ErrNoRows)
-	mockEvent, err = mockBackend.GetSpecificEvent("event0", 3)
+	mockEvent, err = mockBackend.EventVersion("event0", 3)
 
 	if err == nil {
 		t.Fatalf("An error was expected when getting newest event")
 	}
 }
 
-func TestMockUpdateEvent(t *testing.T) {
+func TestMockPutEvent(t *testing.T) {
 	flag.Parse()
 
 	db, err := sqlmock.New()
@@ -348,7 +348,7 @@ func TestMockUpdateEvent(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
-	mockBackend, err := BuildPostgresBackend(db, testEventTable)
+	mockBackend, err := NewPostgresBackend(db, testEventTable)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when creating backend object and tested with ping", err)
 	}
@@ -357,7 +357,7 @@ func TestMockUpdateEvent(t *testing.T) {
 
 	sqlmock.ExpectExec("insert").WillReturnResult(sqlmock.NewResult(0, 1))
 
-	err = mockBackend.UpdateEvent(schema.MakeNewEvent("event2", 3))
+	err = mockBackend.PutEvent(schema.MakeNewEvent("event2", 3))
 
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when getting newest event", err)
