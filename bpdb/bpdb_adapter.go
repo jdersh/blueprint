@@ -16,9 +16,9 @@ type PostgresBackendObject struct {
 }
 
 type eventRow struct {
-	eventName    string
-	eventVersion int
-	eventPayload string
+	name    string
+	version int
+	payload string
 }
 
 func NewPostgresBackend(db *sql.DB, tableName string) (PostgresBackendObject, error) {
@@ -44,9 +44,9 @@ func (pg *PostgresBackendObject) Events() ([]schema.Event, error) {
 	for _, jsonEvent := range jsonEvents {
 		var event schema.Event
 
-		err := json.Unmarshal(jsonEvent, &event)
+		err := json.Unmarshal([]byte(jsonEvent), &event)
 		if err != nil {
-			return []schema.Event{}, fmt.Errorf("Error %v unmarshalling json: %s", err, string(jsonEvent))
+			return []schema.Event{}, fmt.Errorf("Error %v unmarshalling json: %s", err, jsonEvent)
 		}
 
 		events = append(events, event)
@@ -62,9 +62,9 @@ func (pg *PostgresBackendObject) NewestEvent(name string) (schema.Event, error) 
 	}
 
 	var event schema.Event
-	err = json.Unmarshal(jsonEvent, &event)
+	err = json.Unmarshal([]byte(jsonEvent), &event)
 	if err != nil {
-		return schema.Event{}, fmt.Errorf("Error %v unmarshalling newest event json: %s ", err, string(jsonEvent))
+		return schema.Event{}, fmt.Errorf("Error %v unmarshalling newest event json: %s ", err, jsonEvent)
 	}
 	return event, nil
 }
@@ -76,22 +76,20 @@ func (pg *PostgresBackendObject) EventVersion(name string, version int) (schema.
 	}
 
 	var event schema.Event
-	err = json.Unmarshal(jsonEvent, &event)
+	err = json.Unmarshal([]byte(jsonEvent), &event)
 	if err != nil {
-		return schema.Event{}, fmt.Errorf("Error %v unmarshalling specific event json: %s", err, string(jsonEvent))
+		return schema.Event{}, fmt.Errorf("Error %v unmarshalling specific event json: %s", err, jsonEvent)
 	}
 	return event, nil
 }
 
 func (pg *PostgresBackendObject) PutEvent(event schema.Event) error {
-	eventName := event.Name
-	eventVersion := event.Version
 	eventPayload, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("Error %v marshalling event", err)
 	}
 
-	err = pg.putItem(eventName, eventVersion, eventPayload)
+	err = pg.putItem(event.Name, event.Version, string(eventPayload))
 	if err != nil {
 		return fmt.Errorf("Error %v loading event into DB", err)
 	}
@@ -99,10 +97,8 @@ func (pg *PostgresBackendObject) PutEvent(event schema.Event) error {
 	return nil
 }
 
-func (pg *PostgresBackendObject) items() ([][]byte, error) {
-	//'distinct' removes all duplicate rows from the result set, on the column or group of columns it is called on.
-	//'order by' lets you chose which order rows can be displayed
-	//This combination lets you deterministicly pick distinct rows based on the ordering of a secondary column.
+func (pg *PostgresBackendObject) items() ([]string, error) {
+	//Retrieve all the events sorted by newest version, and use distinct to filter out old versions
 	query := fmt.Sprintf(`	select distinct on (event_name)
                     			event_name,
                     			event_version,
@@ -117,77 +113,76 @@ func (pg *PostgresBackendObject) items() ([][]byte, error) {
 
 	defer rawEventRows.Close()
 
-	var byteEvents [][]byte
+	var events []string
 
 	for rawEventRows.Next() {
 		var stringEventRow eventRow
-
 		err := rawEventRows.Scan(
-			&stringEventRow.eventName,
-			&stringEventRow.eventVersion,
-			&stringEventRow.eventPayload)
+			&stringEventRow.name,
+			&stringEventRow.version,
+			&stringEventRow.payload)
 
 		if err != nil {
 			return nil, fmt.Errorf("Error %v storing rows from DB", err)
 		}
 
-		byteEventPayload := []byte(stringEventRow.eventPayload)
-		byteEvents = append(byteEvents, byteEventPayload)
+		events = append(events, stringEventRow.payload)
 	}
 
-	return byteEvents, nil
+	return events, nil
 }
 
-func (pg *PostgresBackendObject) newestItem(name string) ([]byte, error) {
+func (pg *PostgresBackendObject) newestItem(name string) (string, error) {
 	query := fmt.Sprintf(`select event_name, event_version, event_payload from %s
                 where event_name = $1
                 order by event_version desc limit 1;`, pq.QuoteIdentifier(pg.tableName))
 
 	var stringEventRow eventRow
 	err := pg.connection.QueryRow(query, name).Scan(
-		&stringEventRow.eventName,
-		&stringEventRow.eventVersion,
-		&stringEventRow.eventPayload)
+		&stringEventRow.name,
+		&stringEventRow.version,
+		&stringEventRow.payload)
 
 	switch {
 	case err == sql.ErrNoRows:
 		temp, err := json.Marshal(schema.MakeNewEvent(name, 1))
 		if err != nil {
-			return nil, fmt.Errorf("Error %v marshalling json for new event", err)
+			return "", fmt.Errorf("Error %v marshalling json for new event", err)
 		}
-		return temp, nil
+		return string(temp), nil
+
 	case err != nil:
-		return nil, fmt.Errorf("Error %v querying newest item from DB", err)
+		return "", fmt.Errorf("Error %v querying newest item from DB", err)
 	}
 
-	return []byte(stringEventRow.eventPayload), nil
+	return stringEventRow.payload, nil
 }
 
-func (pg *PostgresBackendObject) itemVersion(name string, version int) ([]byte, error) {
+func (pg *PostgresBackendObject) itemVersion(name string, version int) (string, error) {
 	query := fmt.Sprintf(`select event_name, event_version, event_payload from %s
                 where event_name = $1 and event_version = $2
                 order by event_version desc limit 1;`, pq.QuoteIdentifier(pg.tableName))
 
 	var stringEventRow eventRow
 	err := pg.connection.QueryRow(query, name, version).Scan(
-		&stringEventRow.eventName,
-		&stringEventRow.eventVersion,
-		&stringEventRow.eventPayload)
+		&stringEventRow.name,
+		&stringEventRow.version,
+		&stringEventRow.payload)
 
 	switch {
 	case err == sql.ErrNoRows:
-		return nil, fmt.Errorf("Specific item does not exist in DB: %v", err)
+		return "", fmt.Errorf("Specific item does not exist in DB: %v", err)
 	case err != nil:
-		return nil, fmt.Errorf("Error %v querying specific item from DB", err)
+		return "", fmt.Errorf("Error %v querying specific item from DB", err)
 	}
 
-	return []byte(stringEventRow.eventPayload), nil
+	return stringEventRow.payload, nil
 }
 
-func (pg *PostgresBackendObject) putItem(name string, version int, payload []byte) error {
+func (pg *PostgresBackendObject) putItem(name string, version int, payload string) error {
 	query := fmt.Sprintf(`insert into %s values ($1, $2, $3);`, pq.QuoteIdentifier(pg.tableName))
 
-	_, err := pg.connection.Exec(query, name, version, string(payload))
+	_, err := pg.connection.Exec(query, name, version, payload)
 	if err != nil {
 		return fmt.Errorf("Error %v executing insert into DB", err)
 	}
