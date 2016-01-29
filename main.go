@@ -21,7 +21,7 @@ var (
 func main() {
 	flag.Parse()
 	scoopClient := cachingscoopclient.New(*scoopURL, *transformConfig)
-	pgBackend := bpdb.BuildPostgresBackend(*postgresURL)
+	pgBackend := bpdb.NewPostgresBackend(*postgresURL)
 	apiProcess := api.New(*staticFileDir, scoopClient)
 	manager := &core.SubprocessManager{
 		Processes: []core.Subprocess{
