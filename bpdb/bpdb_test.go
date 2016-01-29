@@ -368,7 +368,8 @@ func (pg *PostgresBackendObject) createTestTable() error {
 	query := fmt.Sprintf(`create table %s (
                             event_name varchar(127) not null, 
                             event_version integer not null, 
-                            event_payload JSONB);`, pq.QuoteIdentifier(pg.tableName))
+                            event_payload JSONB, 
+                            primary key (event_name, event_version));`, pq.QuoteIdentifier(pg.tableName))
 
 	_, err := pg.connection.Exec(query)
 	if err != nil {
