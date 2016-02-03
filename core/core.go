@@ -3,9 +3,6 @@ package core
 import (
 	"log"
 	"sync"
-
-	"github.com/twitchscience/scoop_protocol/schema"
-	"github.com/twitchscience/scoop_protocol/scoop_protocol"
 )
 
 // Subprocess represents something that can be set up, started, and stopped. E.g. a server.
@@ -52,49 +49,49 @@ func (s *SubprocessManager) Stop() {
 	}
 }
 
-// Column represents a SQL column in a table for event data.
-type Column struct {
-	// InboundName is the name of the event property.
-	InboundName string `json:"InboundName"`
+// // Column represents a SQL column in a table for event data.
+// type Column struct {
+// 	// InboundName is the name of the event property.
+// 	InboundName string `json:"InboundName"`
 
-	// OutboundName is the name of the column for the event property.
-	OutboundName string `json:"OutboundName"`
+// 	// OutboundName is the name of the column for the event property.
+// 	OutboundName string `json:"OutboundName"`
 
-	// Transformer is the column's SQL type.
-	Transformer string `json:"Transformer"`
+// 	// Transformer is the column's SQL type.
+// 	Transformer string `json:"Transformer"`
 
-	// Length is the length of the SQL type, e.g. for a variable type like varchar.
-	// TODO: length should be an int, currently the client supplies this
-	// to us, so pass through now, with a view to fixing this later
-	Length string `json:"ColumnCreationOptions"`
-}
+// 	// Length is the length of the SQL type, e.g. for a variable type like varchar.
+// 	// TODO: length should be an int, currently the client supplies this
+// 	// to us, so pass through now, with a view to fixing this later
+// 	Length string `json:"ColumnCreationOptions"`
+// }
 
-// ClientUpdateSchemaRequest is a request to update the schema for an event.
-type ClientUpdateSchemaRequest struct {
-	EventName string `json:"-"`
-	Columns   []Column
-}
+// // ClientUpdateSchemaRequest is a request to update the schema for an event.
+// type ClientUpdateSchemaRequest struct {
+// 	EventName string `json:"-"`
+// 	Columns   []Column
+// }
 
-// ConvertToScoopRequest converts the Column data to scoop column definitions and returns a scoop update request.
-func (c *ClientUpdateSchemaRequest) ConvertToScoopRequest() *schema.UpdateSchemaRequest {
-	cols := make([]scoop_protocol.ColumnDefinition, 0, len(c.Columns))
-	for _, c := range c.Columns {
-		cols = append(cols, scoop_protocol.ColumnDefinition{
-			InboundName:           c.InboundName,
-			OutboundName:          c.OutboundName,
-			Transformer:           c.Transformer,
-			ColumnCreationOptions: makeColumnOpts(c.Length),
-		})
-	}
-	return &schema.UpdateSchemaRequest{
-		Columns: cols,
-	}
-}
+// // ConvertToScoopRequest converts the Column data to scoop column definitions and returns a scoop update request.
+// func (c *ClientUpdateSchemaRequest) ConvertToScoopRequest() *schema.UpdateSchemaRequest {
+// 	cols := make([]scoop_protocol.ColumnDefinition, 0, len(c.Columns))
+// 	for _, c := range c.Columns {
+// 		cols = append(cols, scoop_protocol.ColumnDefinition{
+// 			InboundName:           c.InboundName,
+// 			OutboundName:          c.OutboundName,
+// 			Transformer:           c.Transformer,
+// 			ColumnCreationOptions: makeColumnOpts(c.Length),
+// 		})
+// 	}
+// 	return &schema.UpdateSchemaRequest{
+// 		Columns: cols,
+// 	}
+// }
 
-// TODO: as above, the client shouldn't massage this as it is, once
-// that is fixed this function will produce the necessary data
-// structure, maybe a string, maybe something provided by scoop (I
-// prefer the munging into a string to be in scoop).
-func makeColumnOpts(clientProvided string) string {
-	return clientProvided
-}
+// // TODO: as above, the client shouldn't massage this as it is, once
+// // that is fixed this function will produce the necessary data
+// // structure, maybe a string, maybe something provided by scoop (I
+// // prefer the munging into a string to be in scoop).
+// func makeColumnOpts(clientProvided string) string {
+// 	return clientProvided
+// }

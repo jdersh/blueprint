@@ -7,7 +7,6 @@ import (
 	"github.com/gorilla/context"
 	"github.com/twitchscience/blueprint/auth"
 	"github.com/twitchscience/blueprint/core"
-	"github.com/twitchscience/blueprint/scoopclient"
 	"github.com/zenazn/goji"
 	"github.com/zenazn/goji/graceful"
 	"github.com/zenazn/goji/web"
@@ -78,13 +77,9 @@ func (s *server) Setup() error {
 		api.Use(a.AuthorizeOrForbid)
 		api.Use(context.ClearHandler)
 
-		api.Put("/schema", s.createSchema)
-		api.Post("/expire", s.expire)
 		api.Post("/schema/:id", s.updateSchema)
 		api.Post("/removesuggestion/:id", s.removeSuggestion)
 
-		goji.Handle("/expire", api)
-		goji.Handle("/schema", api)
 		goji.Handle("/removesuggestion/*", api)
 
 		goji.Handle(loginURL, a.LoginHandler)
