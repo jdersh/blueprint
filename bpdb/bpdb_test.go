@@ -15,28 +15,28 @@ var (
 	postgresURL    = flag.String("postgresURL", "", "The login url for the postgres DB")
 	useMockDB      = flag.Bool("useMockDB", true, "Whether you want to use the mock db for testing or not.  Defaults to true")
 	testEventTable = "test_event_schemas"
-	dbBackend      DBBackendObject
+	backend        Backend
 )
 
-func setupTestDB() (DBBackendObject, error) {
+func setupTestDB() (Backend, error) {
 	flag.Parse()
 
 	var err error
 
 	if *useMockDB {
-		dbBackend, err = NewDBBackend("sqlite3", "./test_event_db.db", testEventTable)
+		backend, err = New("sqlite3", "./test_event_db.db", testEventTable)
 		if err != nil {
-			return DBBackendObject{}, fmt.Errorf("Could not extablish connection to test DB: %v", err)
+			return Backend{}, fmt.Errorf("Could not extablish connection to test DB: %v", err)
 		}
 	} else {
-		dbBackend, err = NewDBBackend("postgres", *postgresURL, testEventTable)
+		backend, err = New("postgres", *postgresURL, testEventTable)
 		if err != nil {
-			return DBBackendObject{}, fmt.Errorf("Could not extablish connection to DB: %v", err)
+			return Backend{}, fmt.Errorf("Could not extablish connection to DB: %v", err)
 		}
 	}
 
 	if err != nil {
-		return DBBackendObject{}, fmt.Errorf("Could not extablish connection to DB and store to postgres object: %v", err)
+		return Backend{}, fmt.Errorf("Could not extablish connection to DB and store to postgres object: %v", err)
 	}
 
 	testEvents := []schema.Event{
@@ -58,15 +58,15 @@ func setupTestDB() (DBBackendObject, error) {
 		schema.MakeNewEvent("event_should_exist_2_max_ver_4", 4),
 	}
 
-	dbBackend.createTestTable()
+	backend.createTestTable()
 	for _, testEvent := range testEvents {
-		err := dbBackend.PutEvent(testEvent)
+		err := backend.PutEvent(testEvent)
 		if err != nil {
-			return DBBackendObject{}, fmt.Errorf("Could not add test events to DB: %v", err)
+			return Backend{}, fmt.Errorf("Could not add test events to DB: %v", err)
 		}
 	}
 
-	return dbBackend, nil
+	return backend, nil
 }
 
 func DeepEqualChecker(expectedTestEvent, actualTestEvent schema.Event, t *testing.T) {
@@ -78,16 +78,14 @@ func DeepEqualChecker(expectedTestEvent, actualTestEvent schema.Event, t *testin
 }
 
 func TestEvents(t *testing.T) {
-	flag.Parse()
-
-	dbBackend, err := setupTestDB()
+	backend, err := setupTestDB()
 	if err != nil {
 		t.Fatalf("Error %v setting up DB for test", err)
 	}
-	defer dbBackend.connection.Close()
-	defer dbBackend.dropTestTable()
+	defer backend.connection.Close()
+	defer backend.dropTestTable()
 
-	newestTestEvents, err := dbBackend.Events()
+	newestTestEvents, err := backend.Events()
 	if err != nil {
 		t.Fatalf("Could not get events from db: %s", err)
 	}
@@ -107,16 +105,14 @@ func TestEvents(t *testing.T) {
 }
 
 func TestNewestEvent(t *testing.T) {
-	flag.Parse()
-
-	dbBackend, err := setupTestDB()
+	backend, err := setupTestDB()
 	if err != nil {
 		t.Fatalf("Error %v setting up DB for test", err)
 	}
-	defer dbBackend.connection.Close()
-	defer dbBackend.dropTestTable()
+	defer backend.connection.Close()
+	defer backend.dropTestTable()
 
-	newestTestEvent, err := dbBackend.NewestEvent("event_should_exist_2_max_ver_4")
+	newestTestEvent, err := backend.NewestEvent("event_should_exist_2_max_ver_4")
 	if err != nil {
 		t.Fatalf("Could not get event from db: %s", err)
 	}
@@ -125,23 +121,21 @@ func TestNewestEvent(t *testing.T) {
 
 	DeepEqualChecker(expectedTestEvent, newestTestEvent, t)
 
-	newestTestEvent, err = dbBackend.NewestEvent("event_should_not_exist")
+	newestTestEvent, err = backend.NewestEvent("event_should_not_exist")
 	if err == nil {
 		t.Error("Should have errored as event should not have existed")
 	}
 }
 
-func TestEventVersionGeneric(t *testing.T) {
-	flag.Parse()
-
-	dbBackend, err := setupTestDB()
+func TestVersionedEventGeneric(t *testing.T) {
+	backend, err := setupTestDB()
 	if err != nil {
 		t.Fatalf("Error %v setting up DB for test", err)
 	}
-	defer dbBackend.connection.Close()
-	defer dbBackend.dropTestTable()
+	defer backend.connection.Close()
+	defer backend.dropTestTable()
 
-	specificTestEvent, err := dbBackend.EventVersion("event_should_exist_2_max_ver_4", 1)
+	specificTestEvent, err := backend.VersionedEvent("event_should_exist_2_max_ver_4", 1)
 	if err != nil {
 		t.Fatalf("Could not get event from db: %s", err)
 	}
@@ -151,34 +145,30 @@ func TestEventVersionGeneric(t *testing.T) {
 	DeepEqualChecker(expectedTestEvent, specificTestEvent, t)
 }
 
-func TestEventVersionNonExistance(t *testing.T) {
-	flag.Parse()
-
-	dbBackend, err := setupTestDB()
+func TestVersionedEventNonExistance(t *testing.T) {
+	backend, err := setupTestDB()
 	if err != nil {
 		t.Fatalf("Error %v setting up DB for test", err)
 	}
-	defer dbBackend.connection.Close()
-	defer dbBackend.dropTestTable()
+	defer backend.connection.Close()
+	defer backend.dropTestTable()
 
-	specificTestEvent, err := dbBackend.EventVersion("event_should_not_exist", 4)
+	specificTestEvent, err := backend.VersionedEvent("event_should_not_exist", 4)
 	if err == nil {
 		t.Errorf("Should have errored due to event not existing but did not")
 		t.Logf("Unexpected response: %+v", specificTestEvent)
 	}
 }
 
-func TestEventVersionNonVersion(t *testing.T) {
-	flag.Parse()
-
-	dbBackend, err := setupTestDB()
+func TestVersionedEventNonVersion(t *testing.T) {
+	backend, err := setupTestDB()
 	if err != nil {
 		t.Fatalf("Error %v setting up DB for test", err)
 	}
-	defer dbBackend.connection.Close()
-	defer dbBackend.dropTestTable()
+	defer backend.connection.Close()
+	defer backend.dropTestTable()
 
-	specificTestEvent, err := dbBackend.EventVersion("event_should_exist_1_max_ver_1", 2)
+	specificTestEvent, err := backend.VersionedEvent("event_should_exist_1_max_ver_1", 2)
 	if err == nil {
 		t.Errorf("Should have errored due to event version not existing but did not")
 		t.Logf("Unexpected response: %+v", specificTestEvent)
@@ -186,7 +176,7 @@ func TestEventVersionNonVersion(t *testing.T) {
 
 }
 
-func (b *DBBackendObject) createTestTable() error {
+func (b *Backend) createTestTable() error {
 	query := fmt.Sprintf(`	create table %s (
                             	name varchar(127) not null, 
                             	version integer not null, 
@@ -218,7 +208,7 @@ func (b *DBBackendObject) createTestTable() error {
 	return nil
 }
 
-func (b *DBBackendObject) dropTestTable() error {
+func (b *Backend) dropTestTable() error {
 	query := fmt.Sprintf(`drop table %s;`, pq.QuoteIdentifier(b.tableName))
 
 	_, err := b.connection.Exec(query)

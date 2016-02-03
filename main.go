@@ -8,7 +8,6 @@ import (
 	"github.com/twitchscience/blueprint/api"
 	"github.com/twitchscience/blueprint/bpdb"
 	"github.com/twitchscience/blueprint/core"
-	cachingscoopclient "github.com/twitchscience/blueprint/scoopclient/cachingclient"
 )
 
 var (
@@ -20,8 +19,7 @@ var (
 
 func main() {
 	flag.Parse()
-	scoopClient := cachingscoopclient.New(*scoopURL, *transformConfig)
-	pgBackend := bpdb.NewPostgresBackend(*postgresURL)
+	pgBackend := bpdb.New("postgres", *postgresURL, "schemas")
 	apiProcess := api.New(*staticFileDir, scoopClient)
 	manager := &core.SubprocessManager{
 		Processes: []core.Subprocess{
