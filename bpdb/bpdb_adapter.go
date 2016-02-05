@@ -74,7 +74,7 @@ func (b *Backend) NewestEvent(name string) ([]schema.Event, error) {
 func (b *Backend) VersionedEvent(name string, version int) ([]schema.Event, error) {
 	jsonEvent, err := b.versionedItem(name, version)
 	if err != nil {
-		return nil, fmt.Errorf("Error '%v' getting specific event from DB", err)
+		return nil, err
 	}
 
 	var event schema.Event
