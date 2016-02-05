@@ -241,15 +241,20 @@ func (s *server) schema(c web.C, w http.ResponseWriter, r *http.Request) {
 
 	var event []schema.Event
 	var err error
+	var version int
 	if eventVersion == "" {
 		event, err = s.backend.NewestEvent(eventName)
 	} else {
-		eventVersion, err := strconv.Atoi(eventVersion)
+		version, err = strconv.Atoi(eventVersion)
 		if err != nil {
 			fourOhFour(w, r)
 			return
 		}
-		event, err = s.backend.VersionedEvent(eventName, eventVersion)
+		event, err = s.backend.VersionedEvent(eventName, version)
+	}
+	if err == sql.ErrNoRows {
+		http.Error(w, "Event requested does not exist", http.StatusNotFound)
+		return
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
