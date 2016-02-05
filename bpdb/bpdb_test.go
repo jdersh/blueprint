@@ -69,7 +69,7 @@ func setupTestDB() (Backend, error) {
 	return backend, nil
 }
 
-func DeepEqualChecker(expectedTestEvent, actualTestEvent schema.Event, t *testing.T) {
+func DeepEqualChecker(expectedTestEvent, actualTestEvent []schema.Event, t *testing.T) {
 	if !reflect.DeepEqual(actualTestEvent, expectedTestEvent) {
 		t.Errorf("Event grabbed from db was incorrect")
 		t.Logf("Expected response: %+v", expectedTestEvent)
@@ -117,7 +117,7 @@ func TestNewestEvent(t *testing.T) {
 		t.Fatalf("Could not get event from db: %s", err)
 	}
 
-	expectedTestEvent := schema.MakeNewEvent("event_should_exist_2_max_ver_4", 4)
+	expectedTestEvent := []schema.Event{schema.MakeNewEvent("event_should_exist_2_max_ver_4", 4)}
 
 	DeepEqualChecker(expectedTestEvent, newestTestEvent, t)
 
@@ -140,7 +140,7 @@ func TestVersionedEventGeneric(t *testing.T) {
 		t.Fatalf("Could not get event from db: %s", err)
 	}
 
-	expectedTestEvent := schema.MakeNewEvent("event_should_exist_2_max_ver_4", 1)
+	expectedTestEvent := []schema.Event{schema.MakeNewEvent("event_should_exist_2_max_ver_4", 1)}
 
 	DeepEqualChecker(expectedTestEvent, specificTestEvent, t)
 }

@@ -11,16 +11,19 @@ import (
 )
 
 var (
-	scoopURL        = flag.String("scoopURL", "", "the base url for scoop")
-	staticFileDir   = flag.String("staticfiles", "./static", "the location to serve static files from")
-	transformConfig = flag.String("transformConfig", "transforms_available.json", "config for available transforms in spade")
-	postgresURL     = flag.String("postgresURL", "", "The login url for the postgres DB")
+	staticFileDir     = flag.String("staticfiles", "./static", "the location to serve static files from")
+	postgresURL       = flag.String("postgresURL", "", "The login url for the postgres DB")
+	postgresTableName = flag.String("postgresTableName", "", "The name of the postgres table")
 )
 
 func main() {
 	flag.Parse()
-	pgBackend := bpdb.New("postgres", *postgresURL, "schemas")
-	apiProcess := api.New(*staticFileDir, scoopClient)
+	pgBackend, err := bpdb.New("postgres", *postgresURL, *postgresTableName)
+	if err != nil {
+		panic(err)
+	}
+	apiProcess := api.New(*staticFileDir, pgBackend)
+
 	manager := &core.SubprocessManager{
 		Processes: []core.Subprocess{
 			apiProcess,

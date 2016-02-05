@@ -38,7 +38,7 @@ func New(driverName, urlName, tableName string) (Backend, error) {
 func (b *Backend) Events() ([]schema.Event, error) {
 	jsonEvents, err := b.items()
 	if err != nil {
-		return nil, fmt.Errorf("Error '%v' getting events from database", err)
+		return nil, err
 	}
 
 	var events []schema.Event
@@ -48,7 +48,7 @@ func (b *Backend) Events() ([]schema.Event, error) {
 
 		err := json.Unmarshal([]byte(jsonEvent), &event)
 		if err != nil {
-			return []schema.Event{}, fmt.Errorf("Error '%v' unmarshalling json: %s", err, jsonEvent)
+			return nil, fmt.Errorf("Error '%v' unmarshalling json: %s", err, jsonEvent)
 		}
 
 		events = append(events, event)
@@ -57,32 +57,32 @@ func (b *Backend) Events() ([]schema.Event, error) {
 	return events, nil
 }
 
-func (b *Backend) NewestEvent(name string) (schema.Event, error) {
+func (b *Backend) NewestEvent(name string) ([]schema.Event, error) {
 	jsonEvent, err := b.newestItem(name)
 	if err != nil {
-		return schema.Event{}, fmt.Errorf("Error '%v' getting newest event from DB", err)
+		return nil, err
 	}
 
 	var event schema.Event
 	err = json.Unmarshal([]byte(jsonEvent), &event)
 	if err != nil {
-		return schema.Event{}, fmt.Errorf("Error '%v' unmarshalling newest event json: %s ", err, jsonEvent)
+		return nil, fmt.Errorf("Error '%v' unmarshalling newest event json: %s ", err, jsonEvent)
 	}
-	return event, nil
+	return []schema.Event{event}, nil
 }
 
-func (b *Backend) VersionedEvent(name string, version int) (schema.Event, error) {
+func (b *Backend) VersionedEvent(name string, version int) ([]schema.Event, error) {
 	jsonEvent, err := b.versionedItem(name, version)
 	if err != nil {
-		return schema.Event{}, fmt.Errorf("Error '%v' getting specific event from DB", err)
+		return nil, fmt.Errorf("Error '%v' getting specific event from DB", err)
 	}
 
 	var event schema.Event
 	err = json.Unmarshal([]byte(jsonEvent), &event)
 	if err != nil {
-		return schema.Event{}, fmt.Errorf("Error '%v' unmarshalling specific event json: %s", err, jsonEvent)
+		return nil, fmt.Errorf("Error '%v' unmarshalling specific event json: %s", err, jsonEvent)
 	}
-	return event, nil
+	return []schema.Event{event}, nil
 }
 
 func (b *Backend) PutEvent(event schema.Event) error {
@@ -91,7 +91,7 @@ func (b *Backend) PutEvent(event schema.Event) error {
 		return fmt.Errorf("Error '%v' marshalling event", err)
 	}
 
-	err = b.putItem(event.Name, event.Version, string(eventPayload))
+	err = b.putItem(event.EventName, event.Version, string(eventPayload))
 	if err != nil {
 		return fmt.Errorf("Error '%v' loading event into DB", err)
 	}
@@ -150,7 +150,7 @@ func (b *Backend) newestItem(name string) (string, error) {
 
 	switch {
 	case err == sql.ErrNoRows:
-		return "", sql.ErrNoRows
+		return "", err
 	case err != nil:
 		return "", fmt.Errorf("Error '%v' querying newest item from DB", err)
 	}
@@ -173,7 +173,7 @@ func (b *Backend) versionedItem(name string, version int) (string, error) {
 
 	switch {
 	case err == sql.ErrNoRows:
-		return "", sql.ErrNoRows
+		return "", err
 	case err != nil:
 		return "", fmt.Errorf("Error '%v' querying specific item from DB", err)
 	}

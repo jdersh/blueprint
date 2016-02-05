@@ -6,6 +6,7 @@ import (
 
 	"github.com/gorilla/context"
 	"github.com/twitchscience/blueprint/auth"
+	"github.com/twitchscience/blueprint/bpdb"
 	"github.com/twitchscience/blueprint/core"
 	"github.com/zenazn/goji"
 	"github.com/zenazn/goji/graceful"
@@ -13,8 +14,8 @@ import (
 )
 
 type server struct {
-	docRoot    string
-	datasource scoopclient.ScoopClient
+	docRoot string
+	backend bpdb.Backend
 }
 
 var (
@@ -39,10 +40,10 @@ func init() {
 }
 
 // New returns an API process.
-func New(docRoot string, client scoopclient.ScoopClient) core.Subprocess {
+func New(docRoot string, backend bpdb.Backend) core.Subprocess {
 	return &server{
-		docRoot:    docRoot,
-		datasource: client,
+		docRoot: docRoot,
+		backend: backend,
 	}
 }
 
