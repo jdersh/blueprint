@@ -2,19 +2,19 @@ package api
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/twitchscience/blueprint/auth"
-	"github.com/twitchscience/blueprint/core"
-	cachingscoopclient "github.com/twitchscience/blueprint/scoopclient/cachingclient"
-	"github.com/twitchscience/scoop_protocol/scoop_protocol"
+	"github.com/twitchscience/scoop_protocol/schema"
 
 	"github.com/zenazn/goji/web"
 )
@@ -89,72 +89,107 @@ func (s *server) ingest(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (s *server) createSchema(c web.C, w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	b, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-
-	var cfg scoop_protocol.Config
-	err = json.Unmarshal(b, &cfg)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	if err := s.datasource.CreateSchema(&cfg); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-}
-
 func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
-	// TODO: when refactoring the front end do not send the event name
-	// since it should be infered from the url
-	eventName := c.URLParams["id"]
-
 	defer r.Body.Close()
-	b, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
+	r.ParseForm()
+	eventName := c.URLParams["id"]
+	eventVersion := r.FormValue("version")
+
+	if eventVersion == "" {
+		http.Error(w, "Must provide version with migration", http.StatusNotAcceptable)
 		return
 	}
 
-	var req core.ClientUpdateSchemaRequest
-	err = json.Unmarshal(b, &req)
+	version, err := strconv.Atoi(eventVersion)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	req.EventName = eventName
-
-	if err := s.datasource.UpdateSchema(&req); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-}
-
-func (s *server) allSchemas(w http.ResponseWriter, r *http.Request) {
-	cfgs, err := s.datasource.FetchAllSchemas()
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	writeEvent(w, cfgs)
-}
-
-func (s *server) schema(c web.C, w http.ResponseWriter, r *http.Request) {
-	cfg, err := s.datasource.FetchSchema(c.URLParams["id"])
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	if cfg == nil {
 		fourOhFour(w, r)
 		return
 	}
-	writeEvent(w, []scoop_protocol.Config{*cfg})
+
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var migration schema.Migration
+	err = json.Unmarshal(b, &migration)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if migration.Name != eventName {
+		http.Error(w, "Migration event name and URL arg event name Must match", http.StatusNotAcceptable)
+		return
+	}
+
+	currentEvent, err := s.backend.NewestEvent(eventName)
+	if err == sql.ErrNoRows {
+		currentEvent = []schema.Event{schema.MakeNewEvent(eventName, version)}
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if currentEvent[0].Version != version {
+		http.Error(w, "Newer version of schema already exists", http.StatusNotAcceptable)
+		return
+	}
+
+	migrator := schema.BuildMigratorBackend(migration, currentEvent[0])
+
+	newEvent, err := migrator.ApplyMigration()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	currentEvent, err = s.backend.NewestEvent(eventName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if currentEvent[0].Version != version {
+		http.Error(w, "Newer version of schema already exists", http.StatusNotAcceptable)
+		return
+	}
+	s.backend.PutEvent(*newEvent)
+}
+
+func (s *server) allSchemas(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	events, err := s.backend.Events()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeEvent(w, events)
+}
+
+func (s *server) schema(c web.C, w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	r.ParseForm()
+	eventName := c.URLParams["id"]
+	eventVersion := r.FormValue("version")
+
+	var event []schema.Event
+	var err error
+	if eventVersion == "" {
+		event, err = s.backend.NewestEvent(eventName)
+	} else {
+		eventVersion, err := strconv.Atoi(eventVersion)
+		if err != nil {
+			fourOhFour(w, r)
+			return
+		}
+		event, err = s.backend.VersionedEvent(eventName, eventVersion)
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeEvent(w, event)
 }
 
 func (s *server) fileHandler(w http.ResponseWriter, r *http.Request) {
@@ -167,30 +202,25 @@ func (s *server) fileHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) types(w http.ResponseWriter, r *http.Request) {
-	props, err := s.datasource.PropertyTypes()
-	if err != nil {
-		http.Error(w, err.Error(), 500)
+	types := schema.TransformList
+	keys := []string{}
+	for k := range types {
+		keys = append(keys, k)
 	}
 	data := make(map[string][]string)
-	data["result"] = props
+	data["result"] = keys
 	b, err := json.Marshal(data)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Write(b)
 }
 
-func (s *server) expire(w http.ResponseWriter, r *http.Request) {
-	if v := s.datasource.(*cachingscoopclient.CachingClient); v != nil {
-		v.Expire()
-	}
-}
-
 func (s *server) listSuggestions(w http.ResponseWriter, r *http.Request) {
 	availableSuggestions, err := getAvailableSuggestions(s.docRoot)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -201,7 +231,7 @@ func (s *server) listSuggestions(w http.ResponseWriter, r *http.Request) {
 
 	b, err := json.Marshal(availableSuggestions)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Write(b)
