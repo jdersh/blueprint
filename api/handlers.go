@@ -157,6 +157,72 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 	s.backend.PutEvent(*newEvent)
 }
 
+func (s *server) deleteSchema(c web.C, w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	r.ParseForm()
+	eventName := c.URLParams["id"]
+	eventVersion := r.FormValue("version")
+
+	if eventVersion == "" {
+		http.Error(w, "Must provide version with migration", http.StatusNotAcceptable)
+		return
+	}
+
+	version, err := strconv.Atoi(eventVersion)
+	if err != nil {
+		fourOhFour(w, r)
+		return
+	}
+
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var migration schema.Migration
+	err = json.Unmarshal(b, &migration)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if migration.Name != eventName {
+		http.Error(w, "Migration event name and URL arg event name Must match", http.StatusNotAcceptable)
+		return
+	}
+
+	currentEvent, err := s.backend.NewestEvent(eventName)
+	if err != nil {
+		http.Error(w, "Cannot delete event that does not exist", http.StatusInternalServerError)
+		return
+	}
+
+	if currentEvent[0].Version != version {
+		http.Error(w, "Newer version of schema already exists", http.StatusNotAcceptable)
+		return
+	}
+
+	migrator := schema.BuildMigratorBackend(migration, currentEvent[0])
+
+	newEvent, err := migrator.ApplyMigration()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	currentEvent, err = s.backend.NewestEvent(eventName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if currentEvent[0].Version != version {
+		http.Error(w, "Newer version of schema already exists", http.StatusNotAcceptable)
+		return
+	}
+	s.backend.PutEvent(*newEvent)
+}
+
 func (s *server) allSchemas(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	events, err := s.backend.Events()

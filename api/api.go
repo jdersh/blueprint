@@ -82,6 +82,7 @@ func (s *server) Setup() error {
 
 		api.Post("/ingest", s.ingest)
 		api.Post("/schema/:id", s.updateSchema)
+		api.Delete("/schema/:id", s.deleteSchema)
 		api.Post("/removesuggestion/:id", s.removeSuggestion)
 
 		goji.Handle("/ingest", api)
