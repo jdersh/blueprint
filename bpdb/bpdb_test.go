@@ -24,7 +24,7 @@ func setupTestDB() (Backend, error) {
 	var err error
 
 	if *useMockDB {
-		backend, err = New("sqlite3", "./test_event_db.db", testEventTable)
+		backend, err = New("sqlite3", ":memory:", testEventTable)
 		if err != nil {
 			return Backend{}, fmt.Errorf("Could not extablish connection to test DB: %v", err)
 		}
