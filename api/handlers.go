@@ -155,6 +155,8 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.backend.PutEvent(*newEvent)
+
+	writeEvent(w, []schema.Event{*newEvent})
 }
 
 func (s *server) deleteSchema(c web.C, w http.ResponseWriter, r *http.Request) {
@@ -221,6 +223,7 @@ func (s *server) deleteSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.backend.PutEvent(*newEvent)
+	writeEvent(w, []schema.Event{*newEvent})
 }
 
 func (s *server) allSchemas(w http.ResponseWriter, r *http.Request) {
