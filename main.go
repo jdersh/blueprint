@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"os"
 	"os/signal"
@@ -18,10 +19,15 @@ var (
 
 func main() {
 	flag.Parse()
-	pgBackend, err := bpdb.New("postgres", *postgresURL, *postgresTableName)
+	pgConnection, err := sql.Open("postgres", *postgresURL)
 	if err != nil {
 		panic(err)
 	}
+	pgBackend, err := bpdb.New(pgConnection, *postgresTableName)
+	if err != nil {
+		panic(err)
+	}
+	defer pgConnection.Close()
 	apiProcess := api.New(*staticFileDir, pgBackend)
 
 	manager := &core.SubprocessManager{

@@ -1,43 +1,41 @@
-package bpdb
+package test
 
 import (
+	"database/sql"
 	"flag"
 	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/twitchscience/blueprint/bpdb"
 	"github.com/twitchscience/scoop_protocol/schema"
-
-	"github.com/lib/pq"
 )
 
 var (
 	postgresURL    = flag.String("postgresURL", "", "The login url for the postgres DB")
 	useMockDB      = flag.Bool("useMockDB", true, "Whether you want to use the mock db for testing or not.  Defaults to true")
 	testEventTable = "test_event_schemas"
-	backend        Backend
+	backend        bpdb.Backend
 )
 
-func setupTestDB() (Backend, error) {
+func setupTestDB() (bpdb.Backend, *sql.DB, string, error) {
 	flag.Parse()
 
-	var err error
+	var driverName, urlName string
 
 	if *useMockDB {
-		backend, err = New("sqlite3", ":memory:", testEventTable)
-		if err != nil {
-			return Backend{}, fmt.Errorf("Could not extablish connection to test DB: %v", err)
-		}
+		driverName = "sqlite3"
+		urlName = ":memory:"
 	} else {
-		backend, err = New("postgres", *postgresURL, testEventTable)
-		if err != nil {
-			return Backend{}, fmt.Errorf("Could not extablish connection to DB: %v", err)
-		}
+		driverName = "postgres"
+		urlName = *postgresURL
 	}
 
+	connection, err := sql.Open(driverName, urlName)
 	if err != nil {
-		return Backend{}, fmt.Errorf("Could not extablish connection to DB and store to postgres object: %v", err)
+		return bpdb.Backend{}, nil, "", fmt.Errorf("Could not extablish connection to DB: %v", err)
 	}
+	backend, err := bpdb.New(connection, testEventTable)
 
 	testEvents := []schema.Event{
 		schema.MakeNewEvent("event_should_exist_0_max_ver_6", 0),
@@ -58,15 +56,15 @@ func setupTestDB() (Backend, error) {
 		schema.MakeNewEvent("event_should_exist_2_max_ver_4", 4),
 	}
 
-	backend.createTestTable()
+	CreateTestTable(connection, testEventTable)
 	for _, testEvent := range testEvents {
 		err := backend.PutEvent(testEvent)
 		if err != nil {
-			return Backend{}, fmt.Errorf("Could not add test events to DB: %v", err)
+			return bpdb.Backend{}, nil, "", fmt.Errorf("Could not add test events to DB: %v", err)
 		}
 	}
 
-	return backend, nil
+	return backend, connection, testEventTable, nil
 }
 
 func DeepEqualChecker(expectedTestEvent, actualTestEvent []schema.Event, t *testing.T) {
@@ -78,12 +76,12 @@ func DeepEqualChecker(expectedTestEvent, actualTestEvent []schema.Event, t *test
 }
 
 func TestEvents(t *testing.T) {
-	backend, err := setupTestDB()
+	backend, connection, tableName, err := setupTestDB()
 	if err != nil {
 		t.Fatalf("Error %v setting up DB for test", err)
 	}
-	defer backend.connection.Close()
-	defer backend.dropTestTable()
+	defer connection.Close()
+	defer DropTestTable(connection, tableName)
 
 	newestTestEvents, err := backend.Events()
 	if err != nil {
@@ -105,12 +103,12 @@ func TestEvents(t *testing.T) {
 }
 
 func TestNewestEvent(t *testing.T) {
-	backend, err := setupTestDB()
+	backend, connection, tableName, err := setupTestDB()
 	if err != nil {
 		t.Fatalf("Error %v setting up DB for test", err)
 	}
-	defer backend.connection.Close()
-	defer backend.dropTestTable()
+	defer connection.Close()
+	defer DropTestTable(connection, tableName)
 
 	newestTestEvent, err := backend.NewestEvent("event_should_exist_2_max_ver_4")
 	if err != nil {
@@ -128,12 +126,12 @@ func TestNewestEvent(t *testing.T) {
 }
 
 func TestVersionedEventGeneric(t *testing.T) {
-	backend, err := setupTestDB()
+	backend, connection, tableName, err := setupTestDB()
 	if err != nil {
 		t.Fatalf("Error %v setting up DB for test", err)
 	}
-	defer backend.connection.Close()
-	defer backend.dropTestTable()
+	defer connection.Close()
+	defer DropTestTable(connection, tableName)
 
 	specificTestEvent, err := backend.VersionedEvent("event_should_exist_2_max_ver_4", 1)
 	if err != nil {
@@ -146,12 +144,12 @@ func TestVersionedEventGeneric(t *testing.T) {
 }
 
 func TestVersionedEventNonExistance(t *testing.T) {
-	backend, err := setupTestDB()
+	backend, connection, tableName, err := setupTestDB()
 	if err != nil {
 		t.Fatalf("Error %v setting up DB for test", err)
 	}
-	defer backend.connection.Close()
-	defer backend.dropTestTable()
+	defer connection.Close()
+	defer DropTestTable(connection, tableName)
 
 	specificTestEvent, err := backend.VersionedEvent("event_should_not_exist", 4)
 	if err == nil {
@@ -161,12 +159,12 @@ func TestVersionedEventNonExistance(t *testing.T) {
 }
 
 func TestVersionedEventNonVersion(t *testing.T) {
-	backend, err := setupTestDB()
+	backend, connection, tableName, err := setupTestDB()
 	if err != nil {
 		t.Fatalf("Error %v setting up DB for test", err)
 	}
-	defer backend.connection.Close()
-	defer backend.dropTestTable()
+	defer connection.Close()
+	defer DropTestTable(connection, tableName)
 
 	specificTestEvent, err := backend.VersionedEvent("event_should_exist_1_max_ver_1", 2)
 	if err == nil {
@@ -174,47 +172,4 @@ func TestVersionedEventNonVersion(t *testing.T) {
 		t.Logf("Unexpected response: %+v", specificTestEvent)
 	}
 
-}
-
-func (b *Backend) createTestTable() error {
-	query := fmt.Sprintf(`	create table %s (
-                            	name varchar(127) not null, 
-                            	version integer not null, 
-                            	payload JSONB, 
-                            	primary key (name, version));
-								`, pq.QuoteIdentifier(b.tableName))
-
-	_, err := b.connection.Exec(query)
-	if err != nil {
-		return fmt.Errorf("Could not add table to DB: %s", err)
-	}
-
-	query = fmt.Sprintf(`create index %s on %s (name asc);`, pq.QuoteIdentifier(b.tableName+"_name_asc"),
-		pq.QuoteIdentifier(b.tableName))
-
-	_, err = b.connection.Exec(query)
-	if err != nil {
-		return fmt.Errorf("Could not add index name on table %s: %v", b.tableName, err)
-	}
-
-	query = fmt.Sprintf(`create index %s on %s (version desc);`, pq.QuoteIdentifier(b.tableName+"_version_desc"),
-		pq.QuoteIdentifier(b.tableName))
-
-	_, err = b.connection.Exec(query)
-	if err != nil {
-		return fmt.Errorf("Could not add index version on table %s: %v", b.tableName, err)
-	}
-
-	return nil
-}
-
-func (b *Backend) dropTestTable() error {
-	query := fmt.Sprintf(`drop table %s;`, pq.QuoteIdentifier(b.tableName))
-
-	_, err := b.connection.Exec(query)
-	if err != nil {
-		return fmt.Errorf("Could not drop table from DB: %s", err)
-	}
-
-	return nil
 }
