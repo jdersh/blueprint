@@ -22,15 +22,15 @@ type eventRow struct {
 	payload string
 }
 
-func New(driverName, urlName, tableName string) (Backend, error) {
-	db, err := sql.Open(driverName, urlName)
+func New(connection *sql.DB, tableName string) (Backend, error) {
 
+	err := connection.Ping()
 	if err != nil {
-		return Backend{}, fmt.Errorf("Error '%v' establishing connection to %s DB", err, driverName)
+		return Backend{}, fmt.Errorf("Error '%v' establishing connection to DB", err)
 	}
 
 	return Backend{
-		connection: db,
+		connection: connection,
 		tableName:  tableName,
 	}, nil
 }

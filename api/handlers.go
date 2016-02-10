@@ -154,7 +154,11 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Newer version of schema already exists", http.StatusNotAcceptable)
 		return
 	}
-	s.backend.PutEvent(*newEvent)
+	err = s.backend.PutEvent(*newEvent)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	writeEvent(w, []schema.Event{*newEvent})
 }
@@ -222,7 +226,12 @@ func (s *server) deleteSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Newer version of schema already exists", http.StatusNotAcceptable)
 		return
 	}
-	s.backend.PutEvent(*newEvent)
+	err = s.backend.PutEvent(*newEvent)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	writeEvent(w, []schema.Event{*newEvent})
 }
 
