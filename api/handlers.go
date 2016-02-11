@@ -259,7 +259,7 @@ func (s *server) schema(c web.C, w http.ResponseWriter, r *http.Request) {
 	} else {
 		version, err = strconv.Atoi(eventVersion)
 		if err != nil {
-			fourOhFour(w, r)
+			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
 		event, err = s.backend.VersionedEvent(eventName, version)
