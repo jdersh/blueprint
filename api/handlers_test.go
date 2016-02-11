@@ -40,7 +40,12 @@ func setupTestDB() (bpdb.Backend, *sql.DB, string, error) {
 	backend, err := bpdb.New(connection, testEventTable)
 
 	bpdbTest.CreateTestTable(connection, testEventTable)
+	backend.PutEvent(schemaTest.SimEvent1Version1())
+	backend.PutEvent(schemaTest.SimEvent1Version2())
+	backend.PutEvent(schemaTest.SimEvent1Version3())
+	backend.PutEvent(schemaTest.SimEvent1Version4())
 	backend.PutEvent(schemaTest.SimEvent1Version5())
+
 	backend.PutEvent(schemaTest.SimEvent2Version3())
 	backend.PutEvent(schemaTest.SimEvent2Version4())
 	return backend, connection, testEventTable, nil
