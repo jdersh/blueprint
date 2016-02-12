@@ -71,15 +71,16 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentEvent, err = s.backend.NewestEvent(eventName)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if currentEvent[0].Version != version {
-		http.Error(w, "Newer version of schema already exists", http.StatusNotAcceptable)
-		return
-	}
+	// currentEvent, err = s.backend.NewestEvent(eventName)
+	// if err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
+	// if currentEvent[0].Version != version {
+	// 	http.Error(w, "Newer version of schema already exists", http.StatusNotAcceptable)
+	// 	return
+	// }
+
 	err = s.backend.PutEvent(*newEvent)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
