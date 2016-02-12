@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -40,14 +41,7 @@ func setupTestDB() (bpdb.Backend, *sql.DB, string, error) {
 	backend, err := bpdb.New(connection, testEventTable)
 
 	bpdbTest.CreateTestTable(connection, testEventTable)
-	backend.PutEvent(schemaTest.SimEvent1Version1())
-	backend.PutEvent(schemaTest.SimEvent1Version2())
-	backend.PutEvent(schemaTest.SimEvent1Version3())
-	backend.PutEvent(schemaTest.SimEvent1Version4())
-	backend.PutEvent(schemaTest.SimEvent1Version5())
 
-	backend.PutEvent(schemaTest.SimEvent2Version3())
-	backend.PutEvent(schemaTest.SimEvent2Version4())
 	return backend, connection, testEventTable, nil
 }
 
@@ -58,7 +52,20 @@ func setupTestServer() (*server, *sql.DB, string, error) {
 	return server, connection, tableName, err
 }
 
-func jsonEventsDeepEqualsChecker(testEvents, expectedEvents []byte) (bool, error) {
+func fillTestDB(backend bpdb.Backend) {
+	backend.PutEvent(schemaTest.SimEvent1Version1())
+	backend.PutEvent(schemaTest.SimEvent1Version2())
+	backend.PutEvent(schemaTest.SimEvent1Version3())
+	backend.PutEvent(schemaTest.SimEvent1Version4())
+	backend.PutEvent(schemaTest.SimEvent1Version5())
+
+	backend.PutEvent(schemaTest.SimEvent2Version1())
+	backend.PutEvent(schemaTest.SimEvent2Version2())
+	backend.PutEvent(schemaTest.SimEvent2Version3())
+	backend.PutEvent(schemaTest.SimEvent2Version4())
+}
+
+func jsonEventsDeepEqualsChecker(testEvents, expectedEvents []byte, t *testing.T) (bool, error) {
 	var testEventsObject, expectedEventsObject []schema.Event
 	err := json.Unmarshal(testEvents, &testEventsObject)
 	if err != nil {
@@ -69,6 +76,8 @@ func jsonEventsDeepEqualsChecker(testEvents, expectedEvents []byte) (bool, error
 		return false, errors.New("Could not unmarshal expectedEventsObject")
 	}
 	if !reflect.DeepEqual(testEventsObject, expectedEventsObject) {
+		t.Logf("Expected: %+v", expectedEventsObject)
+		t.Logf("Recieved: %+v", testEventsObject)
 		return false, nil
 	}
 	return true, nil
@@ -76,6 +85,7 @@ func jsonEventsDeepEqualsChecker(testEvents, expectedEvents []byte) (bool, error
 
 func TestSchemas(t *testing.T) {
 	server, connection, tableName, err := setupTestServer()
+	fillTestDB(server.backend)
 	defer connection.Close()
 	defer bpdbTest.DropTestTable(connection, tableName)
 
@@ -102,7 +112,7 @@ func TestSchemas(t *testing.T) {
 		t.Error("Could not marshal expected events object")
 	}
 
-	equalsStatus, err := jsonEventsDeepEqualsChecker(w.Body.Bytes(), expectedEvents)
+	equalsStatus, err := jsonEventsDeepEqualsChecker(w.Body.Bytes(), expectedEvents, t)
 	if err != nil {
 		t.Errorf("Could not unmarshal objects in deep equals checker: %s", err.Error())
 	}
@@ -115,6 +125,7 @@ func TestSchemas(t *testing.T) {
 
 func TestNewestSchema(t *testing.T) {
 	server, connection, tableName, err := setupTestServer()
+	fillTestDB(server.backend)
 	defer connection.Close()
 	defer bpdbTest.DropTestTable(connection, tableName)
 
@@ -147,7 +158,7 @@ func TestNewestSchema(t *testing.T) {
 		t.Error("Could not marshal expected events object")
 	}
 
-	equalsStatus, err := jsonEventsDeepEqualsChecker(w.Body.Bytes(), expectedEvents)
+	equalsStatus, err := jsonEventsDeepEqualsChecker(w.Body.Bytes(), expectedEvents, t)
 	if err != nil {
 		t.Errorf("Could not unmarshal objects in deep equals checker: %s", err.Error())
 	}
@@ -159,6 +170,7 @@ func TestNewestSchema(t *testing.T) {
 
 func TestValidSchemaVersion(t *testing.T) {
 	server, connection, tableName, err := setupTestServer()
+	fillTestDB(server.backend)
 	defer connection.Close()
 	defer bpdbTest.DropTestTable(connection, tableName)
 
@@ -191,7 +203,7 @@ func TestValidSchemaVersion(t *testing.T) {
 		t.Error("Could not marshal expected events object")
 	}
 
-	equalsStatus, err := jsonEventsDeepEqualsChecker(w.Body.Bytes(), expectedEvents)
+	equalsStatus, err := jsonEventsDeepEqualsChecker(w.Body.Bytes(), expectedEvents, t)
 	if err != nil {
 		t.Errorf("Could not unmarshal objects in deep equals checker: %s", err.Error())
 	}
@@ -203,6 +215,7 @@ func TestValidSchemaVersion(t *testing.T) {
 
 func TestValidSchemaVersionDoesNotExist(t *testing.T) {
 	server, connection, tableName, err := setupTestServer()
+	fillTestDB(server.backend)
 	defer connection.Close()
 	defer bpdbTest.DropTestTable(connection, tableName)
 
@@ -234,6 +247,7 @@ func TestValidSchemaVersionDoesNotExist(t *testing.T) {
 
 func TestValidSchemaVersionNotInt(t *testing.T) {
 	server, connection, tableName, err := setupTestServer()
+	fillTestDB(server.backend)
 	defer connection.Close()
 	defer bpdbTest.DropTestTable(connection, tableName)
 
@@ -260,6 +274,165 @@ func TestValidSchemaVersionNotInt(t *testing.T) {
 	t.Logf("%d - %s", w.Code, w.Body.String())
 	if w.Code != http.StatusNotFound {
 		t.Errorf("Expected http code %d but recieved vode %d.", http.StatusNotFound, w.Code)
+	}
+}
+
+func TestValidUpdateSchemaAddTable(t *testing.T) {
+	server, connection, tableName, err := setupTestServer()
+
+	defer connection.Close()
+	defer bpdbTest.DropTestTable(connection, tableName)
+
+	if err != nil {
+		t.Error("could not setup test, sql connection did not open")
+	}
+
+	jsonMigration1, err := json.Marshal(schemaTest.SimEvent1Migration1())
+	if err != nil {
+		t.Error("Could not marshal test migration")
+	}
+
+	body := bytes.NewReader(jsonMigration1)
+	r, err := http.NewRequest("POST", "/schema/chat_ignore_client?version=1", body)
+	if err != nil {
+		t.Error(err)
+	}
+
+	w := httptest.NewRecorder()
+
+	c := web.C{
+		URLParams: map[string]string{
+			"id": "chat_ignore_client",
+		},
+	}
+
+	server.updateSchema(c, w, r)
+
+	t.Logf("%d - %s", w.Code, w.Body.String())
+
+	expectedEvents, err := json.Marshal([]schema.Event{
+		schemaTest.SimEvent1Version2(),
+	})
+	if err != nil {
+		t.Error("Could not marshal expected events object")
+	}
+
+	equalsStatus, err := jsonEventsDeepEqualsChecker(w.Body.Bytes(), expectedEvents, t)
+	if err != nil {
+		t.Errorf("Could not unmarshal objects in deep equals checker: %s", err.Error())
+	}
+
+	if !equalsStatus {
+		t.Error("Schemas could not match")
+	}
+}
+
+func TestValidUpdateSchemaUpdateTable(t *testing.T) {
+	server, connection, tableName, err := setupTestServer()
+
+	defer connection.Close()
+	defer bpdbTest.DropTestTable(connection, tableName)
+
+	server.backend.PutEvent(schemaTest.SimEvent1Version1())
+	server.backend.PutEvent(schemaTest.SimEvent1Version2())
+	server.backend.PutEvent(schemaTest.SimEvent1Version3())
+
+	if err != nil {
+		t.Error("could not setup test, sql connection did not open")
+	}
+
+	jsonMigration1, err := json.Marshal(schemaTest.SimEvent1Migration3())
+	if err != nil {
+		t.Error("Could not marshal test migration")
+	}
+
+	body := bytes.NewReader(jsonMigration1)
+	r, err := http.NewRequest("POST", "/schema/chat_ignore_client?version=3", body)
+	if err != nil {
+		t.Error(err)
+	}
+
+	w := httptest.NewRecorder()
+
+	c := web.C{
+		URLParams: map[string]string{
+			"id": "chat_ignore_client",
+		},
+	}
+
+	server.updateSchema(c, w, r)
+
+	t.Logf("%d - %s", w.Code, w.Body.String())
+
+	expectedEvents, err := json.Marshal([]schema.Event{
+		schemaTest.SimEvent1Version4(),
+	})
+	if err != nil {
+		t.Error("Could not marshal expected events object")
+	}
+
+	equalsStatus, err := jsonEventsDeepEqualsChecker(w.Body.Bytes(), expectedEvents, t)
+	if err != nil {
+		t.Errorf("Could not unmarshal objects in deep equals checker: %s", err.Error())
+	}
+
+	if !equalsStatus {
+		t.Error("Schemas could not match")
+	}
+}
+
+func TestValidUpdateSchemaRemoveTable(t *testing.T) {
+	server, connection, tableName, err := setupTestServer()
+
+	defer connection.Close()
+	defer bpdbTest.DropTestTable(connection, tableName)
+
+	server.backend.PutEvent(schemaTest.SimEvent2Version1())
+	server.backend.PutEvent(schemaTest.SimEvent2Version2())
+	server.backend.PutEvent(schemaTest.SimEvent2Version3())
+	server.backend.PutEvent(schemaTest.SimEvent2Version4())
+
+	if err != nil {
+		t.Error("could not setup test, sql connection did not open")
+	}
+
+	jsonMigration1, err := json.Marshal(schemaTest.SimEvent2Migration4())
+	if err != nil {
+		t.Error("Could not marshal test migration")
+	}
+
+	body := bytes.NewReader(jsonMigration1)
+	r, err := http.NewRequest("DELETE", "/schema/login_success?version=4", body)
+	if err != nil {
+		t.Error(err)
+	}
+
+	w := httptest.NewRecorder()
+
+	c := web.C{
+		URLParams: map[string]string{
+			"id": "login_success",
+		},
+	}
+
+	server.deleteSchema(c, w, r)
+
+	t.Logf("%d - %s", w.Code, w.Body.String())
+
+	expectedEvents, err := json.Marshal([]schema.Event{
+		schemaTest.SimEvent2Version5(),
+	})
+	if err != nil {
+		t.Error("Could not marshal expected events object")
+	}
+
+	equalsStatus, err := jsonEventsDeepEqualsChecker(w.Body.Bytes(), expectedEvents, t)
+	if err != nil {
+		t.Errorf("Could not unmarshal objects in deep equals checker: %s", err.Error())
+	}
+
+	if !equalsStatus {
+		t.Error("Schemas could not match")
 	}
 }
 
