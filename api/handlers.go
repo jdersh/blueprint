@@ -52,7 +52,7 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 
 	currentEvent, err := s.backend.NewestEvent(eventName)
 	if err == sql.ErrNoRows {
-		currentEvent = []schema.Event{schema.MakeNewEvent(eventName, version)}
+		currentEvent = []schema.Event{schema.NewEvent(eventName, version)}
 	} else if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -63,7 +63,7 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	migrator := schema.BuildMigratorBackend(migration, currentEvent[0])
+	migrator := schema.NewMigratorBackend(migration, currentEvent[0])
 
 	newEvent, err := migrator.ApplyMigration()
 	if err != nil {
@@ -136,7 +136,7 @@ func (s *server) deleteSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	migrator := schema.BuildMigratorBackend(migration, currentEvent[0])
+	migrator := schema.NewMigratorBackend(migration, currentEvent[0])
 
 	newEvent, err := migrator.ApplyMigration()
 	if err != nil {
