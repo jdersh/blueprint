@@ -38,22 +38,22 @@ func setupTestDB() (bpdb.Backend, *sql.DB, string, error) {
 	backend, err := bpdb.New(connection, testEventTable)
 
 	testEvents := []schema.Event{
-		schema.MakeNewEvent("event_should_exist_0_max_ver_6", 0),
-		schema.MakeNewEvent("event_should_exist_0_max_ver_6", 1),
-		schema.MakeNewEvent("event_should_exist_0_max_ver_6", 2),
-		schema.MakeNewEvent("event_should_exist_0_max_ver_6", 3),
-		schema.MakeNewEvent("event_should_exist_0_max_ver_6", 4),
-		schema.MakeNewEvent("event_should_exist_0_max_ver_6", 5),
-		schema.MakeNewEvent("event_should_exist_0_max_ver_6", 6),
+		schema.NewEvent("event_should_exist_0_max_ver_6", 0),
+		schema.NewEvent("event_should_exist_0_max_ver_6", 1),
+		schema.NewEvent("event_should_exist_0_max_ver_6", 2),
+		schema.NewEvent("event_should_exist_0_max_ver_6", 3),
+		schema.NewEvent("event_should_exist_0_max_ver_6", 4),
+		schema.NewEvent("event_should_exist_0_max_ver_6", 5),
+		schema.NewEvent("event_should_exist_0_max_ver_6", 6),
 
-		schema.MakeNewEvent("event_should_exist_1_max_ver_1", 0),
-		schema.MakeNewEvent("event_should_exist_1_max_ver_1", 1),
+		schema.NewEvent("event_should_exist_1_max_ver_1", 0),
+		schema.NewEvent("event_should_exist_1_max_ver_1", 1),
 
-		schema.MakeNewEvent("event_should_exist_2_max_ver_4", 0),
-		schema.MakeNewEvent("event_should_exist_2_max_ver_4", 1),
-		schema.MakeNewEvent("event_should_exist_2_max_ver_4", 2),
-		schema.MakeNewEvent("event_should_exist_2_max_ver_4", 3),
-		schema.MakeNewEvent("event_should_exist_2_max_ver_4", 4),
+		schema.NewEvent("event_should_exist_2_max_ver_4", 0),
+		schema.NewEvent("event_should_exist_2_max_ver_4", 1),
+		schema.NewEvent("event_should_exist_2_max_ver_4", 2),
+		schema.NewEvent("event_should_exist_2_max_ver_4", 3),
+		schema.NewEvent("event_should_exist_2_max_ver_4", 4),
 	}
 
 	CreateTestTable(connection, testEventTable)
@@ -89,9 +89,9 @@ func TestEvents(t *testing.T) {
 	}
 
 	expectedTestEvents := []schema.Event{
-		schema.MakeNewEvent("event_should_exist_0_max_ver_6", 6),
-		schema.MakeNewEvent("event_should_exist_1_max_ver_1", 1),
-		schema.MakeNewEvent("event_should_exist_2_max_ver_4", 4),
+		schema.NewEvent("event_should_exist_0_max_ver_6", 6),
+		schema.NewEvent("event_should_exist_1_max_ver_1", 1),
+		schema.NewEvent("event_should_exist_2_max_ver_4", 4),
 	}
 
 	//cannot use deepequals checker due to list arguments
@@ -115,7 +115,7 @@ func TestNewestEvent(t *testing.T) {
 		t.Fatalf("Could not get event from db: %s", err)
 	}
 
-	expectedTestEvent := []schema.Event{schema.MakeNewEvent("event_should_exist_2_max_ver_4", 4)}
+	expectedTestEvent := []schema.Event{schema.NewEvent("event_should_exist_2_max_ver_4", 4)}
 
 	DeepEqualChecker(expectedTestEvent, newestTestEvent, t)
 
@@ -138,7 +138,7 @@ func TestVersionedEventGeneric(t *testing.T) {
 		t.Fatalf("Could not get event from db: %s", err)
 	}
 
-	expectedTestEvent := []schema.Event{schema.MakeNewEvent("event_should_exist_2_max_ver_4", 1)}
+	expectedTestEvent := []schema.Event{schema.NewEvent("event_should_exist_2_max_ver_4", 1)}
 
 	DeepEqualChecker(expectedTestEvent, specificTestEvent, t)
 }

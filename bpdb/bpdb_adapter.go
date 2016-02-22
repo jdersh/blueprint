@@ -8,9 +8,11 @@ import (
 	"github.com/twitchscience/scoop_protocol/schema"
 
 	"github.com/lib/pq"
+	//necessary for testing
 	_ "github.com/mattn/go-sqlite3"
 )
 
+//Backend stores the connection object and tableName necessary to store events in DB
 type Backend struct {
 	connection *sql.DB
 	tableName  string
@@ -22,6 +24,7 @@ type eventRow struct {
 	payload string
 }
 
+//New creates a new Backend object for the DB. Establishes connection to the DB
 func New(connection *sql.DB, tableName string) (Backend, error) {
 
 	err := connection.Ping()
@@ -35,6 +38,7 @@ func New(connection *sql.DB, tableName string) (Backend, error) {
 	}, nil
 }
 
+//Events returns the newest version of each event in the DB
 func (b *Backend) Events() ([]schema.Event, error) {
 	jsonEvents, err := b.items()
 	if err != nil {
@@ -57,6 +61,7 @@ func (b *Backend) Events() ([]schema.Event, error) {
 	return events, nil
 }
 
+//NewestEvent returns the single newest event specified
 func (b *Backend) NewestEvent(name string) ([]schema.Event, error) {
 	jsonEvent, err := b.newestItem(name)
 	if err != nil {
@@ -71,6 +76,7 @@ func (b *Backend) NewestEvent(name string) ([]schema.Event, error) {
 	return []schema.Event{event}, nil
 }
 
+//VersionedEvent returns the event in the DB with the specified version
 func (b *Backend) VersionedEvent(name string, version int) ([]schema.Event, error) {
 	jsonEvent, err := b.versionedItem(name, version)
 	if err != nil {
@@ -85,6 +91,7 @@ func (b *Backend) VersionedEvent(name string, version int) ([]schema.Event, erro
 	return []schema.Event{event}, nil
 }
 
+//PutEvent stores the passed in event into the DB
 func (b *Backend) PutEvent(event schema.Event) error {
 	eventPayload, err := json.Marshal(event)
 	if err != nil {
@@ -114,8 +121,6 @@ func (b *Backend) items() ([]string, error) {
 		return nil, fmt.Errorf("Error '%v' querying newest items from DB", err)
 	}
 
-	defer rawEventRows.Close()
-
 	var events []string
 
 	for rawEventRows.Next() {
@@ -130,6 +135,11 @@ func (b *Backend) items() ([]string, error) {
 		}
 
 		events = append(events, row.payload)
+	}
+
+	err = rawEventRows.Close()
+	if err != nil {
+		return nil, err
 	}
 
 	return events, nil
