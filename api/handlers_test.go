@@ -24,8 +24,6 @@ import (
 
 var (
 	testEventTable = "test_event_schemas"
-	backend        bpdb.Backend
-	testServer     server
 )
 
 func setupTestDB() (bpdb.Backend, *sql.DB, string, error) {
@@ -39,8 +37,14 @@ func setupTestDB() (bpdb.Backend, *sql.DB, string, error) {
 		return bpdb.Backend{}, nil, "", fmt.Errorf("Could not extablish connection to DB: %v", err)
 	}
 	backend, err := bpdb.New(connection, testEventTable)
+	if err != nil {
+		return bpdb.Backend{}, nil, "", fmt.Errorf("Could not extablish connection to DB: %v", err)
+	}
 
-	bpdbTest.CreateTestTable(connection, testEventTable)
+	err = bpdbTest.CreateTestTable(connection, testEventTable)
+	if err != nil {
+		return bpdb.Backend{}, nil, "", fmt.Errorf("Could not create test table in DB: %v", err)
+	}
 
 	return backend, connection, testEventTable, nil
 }
@@ -52,17 +56,24 @@ func setupTestServer() (*server, *sql.DB, string, error) {
 	return server, connection, tableName, err
 }
 
-func fillTestDB(backend bpdb.Backend) {
-	backend.PutEvent(schemaTest.SimEvent1Version1())
-	backend.PutEvent(schemaTest.SimEvent1Version2())
-	backend.PutEvent(schemaTest.SimEvent1Version3())
-	backend.PutEvent(schemaTest.SimEvent1Version4())
-	backend.PutEvent(schemaTest.SimEvent1Version5())
+func fillTestDB(backend bpdb.Backend, t *testing.T) {
+	putEventAndCheck(backend, schemaTest.SimEvent1Version1(), t)
+	putEventAndCheck(backend, schemaTest.SimEvent1Version2(), t)
+	putEventAndCheck(backend, schemaTest.SimEvent1Version3(), t)
+	putEventAndCheck(backend, schemaTest.SimEvent1Version4(), t)
+	putEventAndCheck(backend, schemaTest.SimEvent1Version5(), t)
 
-	backend.PutEvent(schemaTest.SimEvent2Version1())
-	backend.PutEvent(schemaTest.SimEvent2Version2())
-	backend.PutEvent(schemaTest.SimEvent2Version3())
-	backend.PutEvent(schemaTest.SimEvent2Version4())
+	putEventAndCheck(backend, schemaTest.SimEvent2Version1(), t)
+	putEventAndCheck(backend, schemaTest.SimEvent2Version2(), t)
+	putEventAndCheck(backend, schemaTest.SimEvent2Version3(), t)
+	putEventAndCheck(backend, schemaTest.SimEvent2Version4(), t)
+}
+
+func putEventAndCheck(backend bpdb.Backend, event schema.Event, t *testing.T) {
+	err := backend.PutEvent(event)
+	if err != nil {
+		t.Errorf("Could not put test event in DB: %v", err)
+	}
 }
 
 func jsonEventsDeepEqualsChecker(testEvents, expectedEvents []byte, t *testing.T) (bool, error) {
@@ -85,12 +96,23 @@ func jsonEventsDeepEqualsChecker(testEvents, expectedEvents []byte, t *testing.T
 
 func TestSchemas(t *testing.T) {
 	server, connection, tableName, err := setupTestServer()
-	fillTestDB(server.backend)
-	defer connection.Close()
-	defer bpdbTest.DropTestTable(connection, tableName)
+	fillTestDB(server.backend, t)
+	defer func() {
+		err := connection.Close()
+		if err != nil {
+			t.Error("Could not close sql connection")
+		}
+	}()
+
+	defer func() {
+		err := bpdbTest.DropTestTable(connection, tableName)
+		if err != nil {
+			t.Errorf("Could not drop table: %s", err.Error())
+		}
+	}()
 
 	if err != nil {
-		t.Error("could not setup test, sql connection did not open")
+		t.Errorf("could not setup test: %s", err.Error())
 	}
 
 	body := strings.NewReader("")
@@ -125,12 +147,23 @@ func TestSchemas(t *testing.T) {
 
 func TestNewestSchema(t *testing.T) {
 	server, connection, tableName, err := setupTestServer()
-	fillTestDB(server.backend)
-	defer connection.Close()
-	defer bpdbTest.DropTestTable(connection, tableName)
+	fillTestDB(server.backend, t)
+	defer func() {
+		err := connection.Close()
+		if err != nil {
+			t.Error("Could not close sql connection")
+		}
+	}()
+
+	defer func() {
+		err := bpdbTest.DropTestTable(connection, tableName)
+		if err != nil {
+			t.Errorf("Could not drop table: %s", err.Error())
+		}
+	}()
 
 	if err != nil {
-		t.Error("could not setup test, sql connection did not open")
+		t.Errorf("could not setup test: %s", err.Error())
 	}
 
 	body := strings.NewReader("")
@@ -170,12 +203,23 @@ func TestNewestSchema(t *testing.T) {
 
 func TestValidSchemaVersion(t *testing.T) {
 	server, connection, tableName, err := setupTestServer()
-	fillTestDB(server.backend)
-	defer connection.Close()
-	defer bpdbTest.DropTestTable(connection, tableName)
+	fillTestDB(server.backend, t)
+	defer func() {
+		err := connection.Close()
+		if err != nil {
+			t.Error("Could not close sql connection")
+		}
+	}()
+
+	defer func() {
+		err := bpdbTest.DropTestTable(connection, tableName)
+		if err != nil {
+			t.Errorf("Could not drop table: %s", err.Error())
+		}
+	}()
 
 	if err != nil {
-		t.Error("could not setup test, sql connection did not open")
+		t.Errorf("could not setup test: %s", err.Error())
 	}
 
 	body := strings.NewReader("")
@@ -215,12 +259,23 @@ func TestValidSchemaVersion(t *testing.T) {
 
 func TestValidSchemaVersionDoesNotExist(t *testing.T) {
 	server, connection, tableName, err := setupTestServer()
-	fillTestDB(server.backend)
-	defer connection.Close()
-	defer bpdbTest.DropTestTable(connection, tableName)
+	fillTestDB(server.backend, t)
+	defer func() {
+		err := connection.Close()
+		if err != nil {
+			t.Error("Could not close sql connection")
+		}
+	}()
+
+	defer func() {
+		err := bpdbTest.DropTestTable(connection, tableName)
+		if err != nil {
+			t.Errorf("Could not drop table: %s", err.Error())
+		}
+	}()
 
 	if err != nil {
-		t.Error("could not setup test, sql connection did not open")
+		t.Errorf("could not setup test: %s", err.Error())
 	}
 
 	body := strings.NewReader("")
@@ -247,12 +302,23 @@ func TestValidSchemaVersionDoesNotExist(t *testing.T) {
 
 func TestValidSchemaVersionNotInt(t *testing.T) {
 	server, connection, tableName, err := setupTestServer()
-	fillTestDB(server.backend)
-	defer connection.Close()
-	defer bpdbTest.DropTestTable(connection, tableName)
+	fillTestDB(server.backend, t)
+	defer func() {
+		err := connection.Close()
+		if err != nil {
+			t.Error("Could not close sql connection")
+		}
+	}()
+
+	defer func() {
+		err := bpdbTest.DropTestTable(connection, tableName)
+		if err != nil {
+			t.Errorf("Could not drop table: %s", err.Error())
+		}
+	}()
 
 	if err != nil {
-		t.Error("could not setup test, sql connection did not open")
+		t.Errorf("could not setup test: %s", err.Error())
 	}
 
 	body := strings.NewReader("")
@@ -280,11 +346,22 @@ func TestValidSchemaVersionNotInt(t *testing.T) {
 func TestValidUpdateSchemaAddTable(t *testing.T) {
 	server, connection, tableName, err := setupTestServer()
 
-	defer connection.Close()
-	defer bpdbTest.DropTestTable(connection, tableName)
+	defer func() {
+		err := connection.Close()
+		if err != nil {
+			t.Error("Could not close sql connection")
+		}
+	}()
+
+	defer func() {
+		err := bpdbTest.DropTestTable(connection, tableName)
+		if err != nil {
+			t.Errorf("Could not drop table: %s", err.Error())
+		}
+	}()
 
 	if err != nil {
-		t.Error("could not setup test, sql connection did not open")
+		t.Errorf("could not setup test: %s", err.Error())
 	}
 
 	jsonMigration1, err := json.Marshal(schemaTest.SimEvent1Migration1())
@@ -330,15 +407,26 @@ func TestValidUpdateSchemaAddTable(t *testing.T) {
 func TestValidUpdateSchemaUpdateTable(t *testing.T) {
 	server, connection, tableName, err := setupTestServer()
 
-	defer connection.Close()
-	defer bpdbTest.DropTestTable(connection, tableName)
+	defer func() {
+		err := connection.Close()
+		if err != nil {
+			t.Error("Could not close sql connection")
+		}
+	}()
 
-	server.backend.PutEvent(schemaTest.SimEvent1Version1())
-	server.backend.PutEvent(schemaTest.SimEvent1Version2())
-	server.backend.PutEvent(schemaTest.SimEvent1Version3())
+	defer func() {
+		err := bpdbTest.DropTestTable(connection, tableName)
+		if err != nil {
+			t.Errorf("Could not drop table: %s", err.Error())
+		}
+	}()
+
+	putEventAndCheck(server.backend, schemaTest.SimEvent1Version1(), t)
+	putEventAndCheck(server.backend, schemaTest.SimEvent1Version2(), t)
+	putEventAndCheck(server.backend, schemaTest.SimEvent1Version3(), t)
 
 	if err != nil {
-		t.Error("could not setup test, sql connection did not open")
+		t.Errorf("could not setup test: %s", err.Error())
 	}
 
 	jsonMigration1, err := json.Marshal(schemaTest.SimEvent1Migration3())
@@ -384,16 +472,27 @@ func TestValidUpdateSchemaUpdateTable(t *testing.T) {
 func TestValidUpdateSchemaRemoveTable(t *testing.T) {
 	server, connection, tableName, err := setupTestServer()
 
-	defer connection.Close()
-	defer bpdbTest.DropTestTable(connection, tableName)
+	defer func() {
+		err := connection.Close()
+		if err != nil {
+			t.Error("Could not close sql connection")
+		}
+	}()
 
-	server.backend.PutEvent(schemaTest.SimEvent2Version1())
-	server.backend.PutEvent(schemaTest.SimEvent2Version2())
-	server.backend.PutEvent(schemaTest.SimEvent2Version3())
-	server.backend.PutEvent(schemaTest.SimEvent2Version4())
+	defer func() {
+		err := bpdbTest.DropTestTable(connection, tableName)
+		if err != nil {
+			t.Errorf("Could not drop table: %s", err.Error())
+		}
+	}()
+
+	putEventAndCheck(server.backend, schemaTest.SimEvent2Version1(), t)
+	putEventAndCheck(server.backend, schemaTest.SimEvent2Version2(), t)
+	putEventAndCheck(server.backend, schemaTest.SimEvent2Version3(), t)
+	putEventAndCheck(server.backend, schemaTest.SimEvent2Version4(), t)
 
 	if err != nil {
-		t.Error("could not setup test, sql connection did not open")
+		t.Errorf("could not setup test: %s", err.Error())
 	}
 
 	jsonMigration1, err := json.Marshal(schemaTest.SimEvent2Migration4())

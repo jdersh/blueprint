@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/twitchscience/scoop_protocol/schema"
 
@@ -121,6 +122,13 @@ func (b *Backend) items() ([]string, error) {
 		return nil, fmt.Errorf("Error '%v' querying newest items from DB", err)
 	}
 
+	defer func() {
+		err := rawEventRows.Close()
+		if err != nil {
+			log.Println("Could not close rows object")
+		}
+	}()
+
 	var events []string
 
 	for rawEventRows.Next() {
@@ -135,11 +143,6 @@ func (b *Backend) items() ([]string, error) {
 		}
 
 		events = append(events, row.payload)
-	}
-
-	err = rawEventRows.Close()
-	if err != nil {
-		return nil, err
 	}
 
 	return events, nil
