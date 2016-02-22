@@ -435,25 +435,3 @@ func TestValidUpdateSchemaRemoveTable(t *testing.T) {
 		t.Error("Schemas could not match")
 	}
 }
-
-// func TestDeleteSchema(t *testing.T) {
-// 	server, connection, tableName, err := setupTestServer()
-// 	if err != nil {
-// 		t.Error("could not setup test, sql connection did not open")
-// 	}
-
-// 	defer connection.Close()
-// 	defer bpdbTest.DropTestTable(connection, tableName)
-
-// }
-
-// func TestUpdateSchema(t *testing.T) {
-// 	server, connection, tableName, err := setupTestServer()
-// 	if err != nil {
-// 		t.Error("could not setup test, sql connection did not open")
-// 	}
-
-// 	defer connection.Close()
-// 	defer bpdbTest.DropTestTable(connection, tableName)
-
-// }
