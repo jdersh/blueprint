@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -16,8 +17,19 @@ import (
 )
 
 func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	r.ParseForm()
+	defer func() {
+		err := r.Body.Close()
+		if err != nil {
+			log.Println("Could not close request body")
+		}
+	}()
+
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	eventName := c.URLParams["id"]
 	eventVersion := r.FormValue("version")
 
@@ -71,16 +83,6 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// currentEvent, err = s.backend.NewestEvent(eventName)
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 	return
-	// }
-	// if currentEvent[0].Version != version {
-	// 	http.Error(w, "Newer version of schema already exists", http.StatusNotAcceptable)
-	// 	return
-	// }
-
 	err = s.backend.PutEvent(*newEvent)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -91,8 +93,19 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) deleteSchema(c web.C, w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	r.ParseForm()
+	defer func() {
+		err := r.Body.Close()
+		if err != nil {
+			log.Println("Could not close request body")
+		}
+	}()
+
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	eventName := c.URLParams["id"]
 	eventVersion := r.FormValue("version")
 
@@ -163,7 +176,13 @@ func (s *server) deleteSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) allSchemas(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
+	defer func() {
+		err := r.Body.Close()
+		if err != nil {
+			log.Println("Could not close request body")
+		}
+	}()
+
 	events, err := s.backend.Events()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -173,13 +192,23 @@ func (s *server) allSchemas(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) schema(c web.C, w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	r.ParseForm()
+	defer func() {
+		err := r.Body.Close()
+		if err != nil {
+			log.Println("Could not close request body")
+		}
+	}()
+
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	eventName := c.URLParams["id"]
 	eventVersion := r.FormValue("version")
 
 	var event []schema.Event
-	var err error
 	var version int
 	if eventVersion == "" {
 		event, err = s.backend.NewestEvent(eventName)
@@ -208,7 +237,11 @@ func (s *server) fileHandler(w http.ResponseWriter, r *http.Request) {
 		fourOhFour(w, r)
 		return
 	}
-	io.Copy(w, fh)
+	_, err = io.Copy(w, fh)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (s *server) types(w http.ResponseWriter, r *http.Request) {
@@ -224,7 +257,11 @@ func (s *server) types(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Write(b)
+	_, err = w.Write(b)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (s *server) listSuggestions(w http.ResponseWriter, r *http.Request) {
@@ -235,7 +272,11 @@ func (s *server) listSuggestions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(availableSuggestions) == 0 {
-		w.Write([]byte("[]"))
+		_, err = w.Write([]byte("[]"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		return
 	}
 
@@ -244,7 +285,11 @@ func (s *server) listSuggestions(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Write(b)
+	_, err = w.Write(b)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (s *server) suggestion(c web.C, w http.ResponseWriter, r *http.Request) {
@@ -257,7 +302,11 @@ func (s *server) suggestion(c web.C, w http.ResponseWriter, r *http.Request) {
 		fourOhFour(w, r)
 		return
 	}
-	io.Copy(w, fh)
+	_, err = io.Copy(w, fh)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (s *server) removeSuggestion(c web.C, w http.ResponseWriter, r *http.Request) {
@@ -274,5 +323,9 @@ func (s *server) removeSuggestion(c web.C, w http.ResponseWriter, r *http.Reques
 }
 
 func (s *server) healthCheck(c web.C, w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Healthy")
+	_, err := io.WriteString(w, "Healthy")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
