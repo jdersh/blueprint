@@ -78,7 +78,11 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if currentEvent[0].Version != version {
+	if currentEvent[0].Version < version {
+		http.Error(w, "Version provided is higher than the newest version available", http.StatusNotAcceptable)
+		return
+	}
+	if currentEvent[0].Version > version {
 		http.Error(w, "Newer version of schema already exists", http.StatusNotAcceptable)
 		return
 	}
