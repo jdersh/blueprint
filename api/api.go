@@ -15,7 +15,7 @@ import (
 
 type server struct {
 	docRoot string
-	backend bpdb.Backend
+	backend bpdb.Adapter
 }
 
 var (
@@ -40,7 +40,7 @@ func init() {
 }
 
 // New returns an API process.
-func New(docRoot string, backend bpdb.Backend) core.Subprocess {
+func New(docRoot string, backend bpdb.Adapter) core.Subprocess {
 	return &server{
 		docRoot: docRoot,
 		backend: backend,
@@ -79,7 +79,7 @@ func (s *server) Setup() error {
 		api.Use(context.ClearHandler)
 
 		api.Post("/schema/:id", s.updateSchema)
-		api.Delete("/schema/:id", s.deleteSchema)
+		api.Delete("/schema/:id", s.updateSchema)
 		api.Post("/removesuggestion/:id", s.removeSuggestion)
 
 		goji.Handle("/removesuggestion/*", api)

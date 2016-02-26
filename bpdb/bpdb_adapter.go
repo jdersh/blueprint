@@ -9,8 +9,6 @@ import (
 	"github.com/twitchscience/scoop_protocol/schema"
 
 	"github.com/lib/pq"
-	//necessary for testing
-	_ "github.com/mattn/go-sqlite3"
 )
 
 //Backend stores the connection object and tableName necessary to store events in DB
@@ -26,14 +24,14 @@ type eventRow struct {
 }
 
 //New creates a new Backend object for the DB. Establishes connection to the DB
-func New(connection *sql.DB, tableName string) (Backend, error) {
+func New(connection *sql.DB, tableName string) (Adapter, error) {
 
 	err := connection.Ping()
 	if err != nil {
-		return Backend{}, fmt.Errorf("Error '%v' establishing connection to DB", err)
+		return &Backend{}, fmt.Errorf("Error '%v' establishing connection to DB", err)
 	}
 
-	return Backend{
+	return &Backend{
 		connection: connection,
 		tableName:  tableName,
 	}, nil

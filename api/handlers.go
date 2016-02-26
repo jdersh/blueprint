@@ -20,7 +20,7 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		err := r.Body.Close()
 		if err != nil {
-			log.Println("Could not close request body")
+			log.Printf("Could not close request body: %s", err.Error())
 		}
 	}()
 
@@ -33,7 +33,7 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 	eventName := c.URLParams["id"]
 	eventVersion := r.FormValue("version")
 
-	if eventVersion == "" {
+	if !(len(eventVersion) > 0) {
 		http.Error(w, "Must provide version with migration", http.StatusNotAcceptable)
 		return
 	}
@@ -63,85 +63,19 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 	}
 
 	currentEvent, err := s.backend.NewestEvent(eventName)
-	if err == sql.ErrNoRows {
-		currentEvent = []schema.Event{schema.NewEvent(eventName, version)}
-	} else if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 
-	if currentEvent[0].Version != version {
-		http.Error(w, "Newer version of schema already exists", http.StatusNotAcceptable)
-		return
-	}
-
-	migrator := schema.NewMigratorBackend(migration, currentEvent[0])
-
-	newEvent, err := migrator.ApplyMigration()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	err = s.backend.PutEvent(*newEvent)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	writeEvent(w, []schema.Event{*newEvent})
-}
-
-func (s *server) deleteSchema(c web.C, w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		err := r.Body.Close()
+	if migration.IsRemoveEvent() {
 		if err != nil {
-			log.Println("Could not close request body")
+			http.Error(w, "Cannot delete event that does not exist", http.StatusInternalServerError)
+			return
 		}
-	}()
-
-	err := r.ParseForm()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	eventName := c.URLParams["id"]
-	eventVersion := r.FormValue("version")
-
-	if eventVersion == "" {
-		http.Error(w, "Must provide version with migration", http.StatusNotAcceptable)
-		return
-	}
-
-	version, err := strconv.Atoi(eventVersion)
-	if err != nil {
-		fourOhFour(w, r)
-		return
-	}
-
-	b, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var migration schema.Migration
-	err = json.Unmarshal(b, &migration)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if migration.Name != eventName {
-		http.Error(w, "Migration event name and URL arg event name Must match", http.StatusNotAcceptable)
-		return
-	}
-
-	currentEvent, err := s.backend.NewestEvent(eventName)
-	if err != nil {
-		http.Error(w, "Cannot delete event that does not exist", http.StatusInternalServerError)
-		return
+	} else {
+		if err == sql.ErrNoRows {
+			currentEvent = []schema.Event{schema.NewEvent(eventName, version)}
+		} else if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	if currentEvent[0].Version != version {
@@ -157,29 +91,20 @@ func (s *server) deleteSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentEvent, err = s.backend.NewestEvent(eventName)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if currentEvent[0].Version != version {
-		http.Error(w, "Newer version of schema already exists", http.StatusNotAcceptable)
-		return
-	}
-	err = s.backend.PutEvent(*newEvent)
+	err = s.backend.PutEvent(newEvent)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	writeEvent(w, []schema.Event{*newEvent})
+	writeEvent(w, []schema.Event{newEvent})
 }
 
 func (s *server) allSchemas(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		err := r.Body.Close()
 		if err != nil {
-			log.Println("Could not close request body")
+			log.Printf("Could not close request body: %s", err.Error())
 		}
 	}()
 
@@ -195,7 +120,7 @@ func (s *server) schema(c web.C, w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		err := r.Body.Close()
 		if err != nil {
-			log.Println("Could not close request body")
+			log.Printf("Could not close request body: %s", err.Error())
 		}
 	}()
 
@@ -210,7 +135,7 @@ func (s *server) schema(c web.C, w http.ResponseWriter, r *http.Request) {
 
 	var event []schema.Event
 	var version int
-	if eventVersion == "" {
+	if !(len(eventVersion) > 0) {
 		event, err = s.backend.NewestEvent(eventName)
 	} else {
 		version, err = strconv.Atoi(eventVersion)
