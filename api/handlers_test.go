@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -20,30 +19,30 @@ import (
 	schemaTest "github.com/twitchscience/scoop_protocol/schema/test"
 
 	"github.com/zenazn/goji/web"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
 	testEventTable = "test_event_schemas"
 )
 
-func setupTestDB() (bpdb.Backend, *sql.DB, string, error) {
-	flag.Parse()
-
+func setupTestDB() (bpdb.Adapter, *sql.DB, string, error) {
 	driverName := "sqlite3"
 	urlName := ":memory:"
 
 	connection, err := sql.Open(driverName, urlName)
 	if err != nil {
-		return bpdb.Backend{}, nil, "", fmt.Errorf("Could not extablish connection to DB: %v", err)
+		return &bpdb.Backend{}, nil, "", fmt.Errorf("Could not extablish connection to DB: %v", err)
 	}
 	backend, err := bpdb.New(connection, testEventTable)
 	if err != nil {
-		return bpdb.Backend{}, nil, "", fmt.Errorf("Could not extablish connection to DB: %v", err)
+		return &bpdb.Backend{}, nil, "", fmt.Errorf("Could not extablish connection to DB: %v", err)
 	}
 
 	err = bpdbTest.CreateTestTable(connection, testEventTable)
 	if err != nil {
-		return bpdb.Backend{}, nil, "", fmt.Errorf("Could not create test table in DB: %v", err)
+		return &bpdb.Backend{}, nil, "", fmt.Errorf("Could not create test table in DB: %v", err)
 	}
 
 	return backend, connection, testEventTable, nil
@@ -56,7 +55,7 @@ func setupTestServer() (*server, *sql.DB, string, error) {
 	return server, connection, tableName, err
 }
 
-func fillTestDB(backend bpdb.Backend, t *testing.T) {
+func fillTestDB(backend bpdb.Adapter, t *testing.T) {
 	putEventAndCheck(backend, schemaTest.SimEvent1Version1(), t)
 	putEventAndCheck(backend, schemaTest.SimEvent1Version2(), t)
 	putEventAndCheck(backend, schemaTest.SimEvent1Version3(), t)
@@ -69,7 +68,7 @@ func fillTestDB(backend bpdb.Backend, t *testing.T) {
 	putEventAndCheck(backend, schemaTest.SimEvent2Version4(), t)
 }
 
-func putEventAndCheck(backend bpdb.Backend, event schema.Event, t *testing.T) {
+func putEventAndCheck(backend bpdb.Adapter, event schema.Event, t *testing.T) {
 	err := backend.PutEvent(event)
 	if err != nil {
 		t.Errorf("Could not put test event in DB: %v", err)
@@ -514,7 +513,7 @@ func TestValidUpdateSchemaRemoveTable(t *testing.T) {
 		},
 	}
 
-	server.deleteSchema(c, w, r)
+	server.updateSchema(c, w, r)
 
 	t.Logf("%d - %s", w.Code, w.Body.String())
 

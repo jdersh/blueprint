@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"log"
 	"os"
 	"os/signal"
 
@@ -27,7 +28,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer pgConnection.Close()
+
 	apiProcess := api.New(*staticFileDir, pgBackend)
 
 	manager := &core.SubprocessManager{
@@ -45,4 +46,9 @@ func main() {
 	}()
 
 	manager.Wait()
+
+	err = pgConnection.Close()
+	if err != nil {
+		log.Printf(err.Error())
+	}
 }

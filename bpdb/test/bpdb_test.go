@@ -9,6 +9,8 @@ import (
 
 	"github.com/twitchscience/blueprint/bpdb"
 	"github.com/twitchscience/scoop_protocol/schema"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
@@ -18,7 +20,7 @@ var (
 	backend        bpdb.Backend
 )
 
-func setupTestDB() (bpdb.Backend, *sql.DB, string, error) {
+func setupTestDB() (bpdb.Adapter, *sql.DB, string, error) {
 	flag.Parse()
 
 	var driverName, urlName string
@@ -33,7 +35,7 @@ func setupTestDB() (bpdb.Backend, *sql.DB, string, error) {
 
 	connection, err := sql.Open(driverName, urlName)
 	if err != nil {
-		return bpdb.Backend{}, nil, "", fmt.Errorf("Could not extablish connection to DB: %v", err)
+		return &bpdb.Backend{}, nil, "", fmt.Errorf("Could not extablish connection to DB: %v", err)
 	}
 	backend, err := bpdb.New(connection, testEventTable)
 
@@ -60,7 +62,7 @@ func setupTestDB() (bpdb.Backend, *sql.DB, string, error) {
 	for _, testEvent := range testEvents {
 		err := backend.PutEvent(testEvent)
 		if err != nil {
-			return bpdb.Backend{}, nil, "", fmt.Errorf("Could not add test events to DB: %v", err)
+			return &bpdb.Backend{}, nil, "", fmt.Errorf("Could not add test events to DB: %v", err)
 		}
 	}
 
