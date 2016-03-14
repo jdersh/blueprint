@@ -126,7 +126,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       }
     });
   })
-  .controller('SchemaShowCtrl', function ($scope, $location, $routeParams, $q, store, Schema, Types, ColumnMaker) {
+  .controller('SchemaShowCtrl', function ($scope, $location, $route, $routeParams, $q, store, Schema, Types, ColumnMaker) {
     var types, schema;
     var typeRequest = Types.get(function(data) {
       if (data) {
@@ -173,6 +173,9 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
             return false;
           }
         }
+        if (column.Transformer === 'int') {
+            column.Transformer = 'bigint';
+        }
 
         // Update the view, but we only submit $scope.additions
         $scope.additions.Columns.push(column);
@@ -188,9 +191,26 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
           store.setError("No new columns, so no action taken.", undefined);
           return false;
         }
-        Schema.update({event: additions.EventName}, additions, function() {
+        var migration = {
+          TableOperation:   'update',
+          Name:             additions.EventName,
+          ColumnOperations: [],
+          TableOption: $scope.schema.TableOption
+        }
+
+        angular.forEach(additions.Columns, function(item) {
+          var columnOperation = {
+            Operation:           'add',
+            InboundName:         item.InboundName,
+            OutboundName:        item.OutboundName,
+            NewColumnDefinition: item
+          }
+          migration.ColumnOperations.push(columnOperation);
+        })
+
+        Schema.update({event: additions.EventName, version: $scope.schema.Version}, migration, function() {
+          $route.reload();
           store.setMessage("Succesfully updated schema: " +  additions.EventName);
-          $location.path('/schema/' + additions.EventName);
         }, function(err) {
           store.setError(err, undefined);
         });
