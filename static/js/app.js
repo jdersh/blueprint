@@ -196,7 +196,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
           Name:             additions.EventName,
           ColumnOperations: [],
           TableOption: $scope.schema.TableOption
-        }
+        };
 
         angular.forEach(additions.Columns, function(item) {
           var columnOperation = {
@@ -204,9 +204,9 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
             InboundName:         item.InboundName,
             OutboundName:        item.OutboundName,
             NewColumnDefinition: item
-          }
+          };
           migration.ColumnOperations.push(columnOperation);
-        })
+        });
 
         Schema.update({event: additions.EventName, version: $scope.schema.Version}, migration, function() {
           $route.reload();
@@ -390,7 +390,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
             DistKey: [event.distkey],
             SortKey: [],
           }
-        }
+        };
 
         angular.forEach(event.Columns, function(item) {
           if (!ColumnMaker.validate(item)) {
@@ -407,7 +407,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
             columnDefinition.Transformer = 'bigint';
           }
           if (item.OutboundName === 'time') {
-            migration.TableOption.SortKey.push(item.OutboundName)
+            migration.TableOption.SortKey.push(item.OutboundName);
           }
 
           var columnOperation = {
@@ -415,25 +415,25 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
             InboundName:         columnDefinition.InboundName,
             OutboundName:        columnDefinition.OutboundName,
             NewColumnDefinition: columnDefinition
-          }
+          };
 
-          migration.ColumnOperations.push(columnOperation)
+          migration.ColumnOperations.push(columnOperation);
         });
 
         if (store.getError()) {
           return;
         }
         return migration;
-      }
+      };
 
       $scope.createSchema = function() {
         
         var migration = makeTableCreateMigration($scope.event);
-        if (migration == null) return;
+        if (migration === null) return;
         Schema.create({event: $scope.event.EventName, version: 0}, 
                     migration, 
                     function() {
-                      store.setMessage("Succesfully created schema: " + $scope.event.EventName)
+                      store.setMessage("Succesfully created schema: " + $scope.event.EventName);
                       $location.path('/schema/' + $scope.event.EventName);
                     }, 
                     function(err) {
