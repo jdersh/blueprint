@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -24,11 +25,15 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	fmt.Println("1")
+
 	err := r.ParseForm()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	fmt.Println("2")
 
 	eventName := c.URLParams["id"]
 	eventVersion := r.FormValue("version")
@@ -38,17 +43,25 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("3")
+
 	version, err := strconv.Atoi(eventVersion)
 	if err != nil {
 		fourOhFour(w, r)
 		return
 	}
 
+	fmt.Println("4")
+
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	fmt.Println("5")
+
+	fmt.Printf("%s", string(b))
 
 	var migration schema.Migration
 	err = json.Unmarshal(b, &migration)
@@ -57,10 +70,14 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("6")
+
 	if migration.Name != eventName {
 		http.Error(w, "Migration event name and URL arg event name Must match", http.StatusNotAcceptable)
 		return
 	}
+
+	fmt.Println("7")
 
 	currentEvent, err := s.backend.NewestEvent(eventName)
 
@@ -77,6 +94,8 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	fmt.Println("8")
 
 	if currentEvent[0].Version < version {
 		http.Error(w, "Version provided is higher than the newest version available", http.StatusNotAcceptable)

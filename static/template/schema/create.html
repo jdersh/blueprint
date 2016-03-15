@@ -1,7 +1,9 @@
 <div>
   <form ng-submit="createSchema()" name="createSchemaForm">
     <h1><a href="#/schemas">&#x21e6;</a> Create Schema for
-    <input ng-model="event.EventName" value="event.EventName"/></h1>
+    <input ng-model="event.EventName" 
+           value="event.EventName"
+           ng-blur="redirectEvent()"/></h1>
 
     <table class="table table-hover">
       <thead>

@@ -12,7 +12,6 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       '/schemas', null,
       {all: {method: 'GET', isArray: true},
        get: {url: '/schema/:scope', method:'GET', isArray: true},
-       create: {url: '/schema/:event', method: 'POST', isArray: true},
        update: {url: '/schema/:event', method: 'POST', isArray: true}
       }
     );
@@ -215,6 +214,21 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
           store.setError(err, undefined);
         });
       };
+      $scope.dropSchema = function() {
+        var additions = $scope.additions;
+        var migration = {
+          TableOperation:   'remove',
+          Name:             additions.EventName,
+          ColumnOperations: []
+        };
+
+        Schema.update({event: additions.EventName, version: $scope.schema.Version}, migration, function() {
+          $route.reload();
+          store.setMessage("Succesfully removed schema: " +  additions.EventName);
+        }, function(err) {
+          store.setError(err, undefined);
+        });
+      };
     });
   })
   .controller('SchemaListCtrl', function($scope, $location, Schema, Suggestions, store) {
@@ -251,7 +265,8 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         if (data) {
           suggestions = data;
         }
-      }).$promise;
+      },
+      function(err) {}).$promise;
     } else {
       var deferScratch = $q.defer();
       deferScratch.resolve();
@@ -335,6 +350,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       // representation which BluePrint converts to what spade cares
       // about but for the timebeing this is the quickest solution
       if (!suggestions) {
+        event.EventName = $routeParams['scope']
         event.Columns = defaultColumns;
       } else {
         event = suggestions;
@@ -380,6 +396,9 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       $scope.dropColumnFromSchema = function(columnInd) {
         $scope.event.Columns.splice(columnInd, 1);
       }
+      $scope.redirectEvent = function() {
+        $location.search('scope', $scope.event.EventName);
+      };
       var makeTableCreateMigration = function(event) {
         store.clearError();
         var migration = {
@@ -430,7 +449,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         
         var migration = makeTableCreateMigration($scope.event);
         if (migration === null) return;
-        Schema.create({event: $scope.event.EventName, version: 0}, 
+        Schema.update({event: $scope.event.EventName, version: 0}, 
                     migration, 
                     function() {
                       store.setMessage("Succesfully created schema: " + $scope.event.EventName);

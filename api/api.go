@@ -79,7 +79,7 @@ func (s *server) Setup() error {
 		api.Use(context.ClearHandler)
 
 		api.Post("/schema/:id", s.updateSchema)
-		api.Delete("/schema/:id", s.updateSchema)
+		api.Post("/schema/:id", s.updateSchema)
 		api.Post("/removesuggestion/:id", s.removeSuggestion)
 
 		goji.Handle("/removesuggestion/*", api)
