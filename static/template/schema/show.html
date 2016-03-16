@@ -1,4 +1,6 @@
-<h1><a href="#/schemas">&#x21e6</a> Published Schema for {{schema.EventName}}</h1>
+<h1><a href="#/schemas">&#x21e6</a> Published Schema for {{schema.EventName}}
+<small><span style="float:right;">Version: {{schema.Version}}</span></small>
+</h1>
 
 <form name="updateSchemaForm" ng-submit="updateSchema()">
 
@@ -13,12 +15,14 @@
     </tr>
   </thead>
   <tbody>
-    <tr ng-repeat="c in schema.Columns">
+
+    <tr ng-repeat="c in schema.Columns" ng-class="{danger: inSubtractions(c)}">
       <td>{{c.InboundName}}</td>
       <td>{{c.OutboundName}}</td>
       <td>{{c.Transformer}}</td>
       <td class="text-center">{{c.ColumnCreationOptions}}</td>
       <td class="text-center">
+
       <div ng-if="!inSubtractions(c)">
         <button ng-click="subColumnFromSchema(c)"
                 type="button"
@@ -31,6 +35,7 @@
       </div>
       </td>
     </tr>
+
     <tr ng-repeat="c in additions.Columns">
       <td>{{c.InboundName}}</td>
       <td>{{c.OutboundName}}</td>

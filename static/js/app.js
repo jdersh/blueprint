@@ -190,6 +190,10 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
           store.setError("Column selected for removal is DistKey", undefined);
           return false;
         }
+        if ($scope.schema.TableOption.SortKey.indexOf(column.OutboundName) > -1 ){
+          store.setError("Column selected for removal is SortKey", undefined);
+          return false;
+        }
         var index = $scope.subtractions.Columns.indexOf(column);
         if (index > -1) {
           store.setError("Column selected for removal is already subject for removal", undefined);
@@ -204,7 +208,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         }
       };
       $scope.inSubtractions = function(column) {
-        return ($scope.subtractions.Columns.indexOf(column) > -1);
+        return ($scope.subtractions.Columns.indexOf(column) != -1);
       };
       $scope.updateSchema = function() {
         var additions = $scope.additions;
