@@ -164,7 +164,7 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 
 	newEvent, err := migrator.ApplyMigration()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusNotAcceptable)
 		return
 	}
 

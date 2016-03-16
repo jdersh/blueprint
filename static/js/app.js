@@ -154,9 +154,12 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       if (!schema || !types) {
         store.setError('API Error', '/schemas');
       }
-      $scope.schema = schema;
+      $scope.schema = angular.copy(schema);
+      $scope.schemaSource = schema;
+      $scope.checkbox = false;
       $scope.additions = {Columns: [], EventName: schema.EventName}; // Used to hold new columns
-      $scope.subtractions = {Columns: [], EventName: schema.EventName};
+      $scope.subtractions = {Columns: [], EventName: schema.EventName}; //Used to hold removed columns
+      $scope.updates = {Columns: [], EventName: schema.EventName}; //used to hold updated columns
       $scope.types = types;
       $scope.newCol = ColumnMaker.make();
       $scope.addColumnToSchema = function(column) {
@@ -185,27 +188,37 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       $scope.dropColumnFromAdditions = function(colInd) {
         $scope.additions.Columns.splice(colInd, 1);
       };
-      $scope.subColumnFromSchema = function(column) {
-        if ($scope.schema.TableOption.DistKey.indexOf(column.OutboundName) > -1 ){
-          store.setError("Column selected for removal is DistKey", undefined);
+      $scope.subColumnFromSchema = function(colInd) {
+        if ($scope.schema.TableOption.DistKey.indexOf($scope.schema.Columns[colInd].OutboundName) > -1 ){
+          store.setError("Column selected for update is DistKey", undefined);
           return false;
         }
-        if ($scope.schema.TableOption.SortKey.indexOf(column.OutboundName) > -1 ){
-          store.setError("Column selected for removal is SortKey", undefined);
+        if ($scope.schema.TableOption.SortKey.indexOf($scope.schema.Columns[colInd].OutboundName) > -1 ){
+          store.setError("Column selected for update is SortKey", undefined);
           return false;
         }
-        var index = $scope.subtractions.Columns.indexOf(column);
-        if (index > -1) {
-          store.setError("Column selected for removal is already subject for removal", undefined);
-          return false;
-        }
-        $scope.subtractions.Columns.push(column);
+        $scope.subtractions.Columns[colInd] = $scope.schema.Columns[colInd];
       };
-      $scope.dropColumnFromSubtractions = function(column) {
-        var index = $scope.subtractions.Columns.indexOf(column);
-        if (index > -1) {
-          $scope.subtractions.Columns.splice(index, 1);
+      $scope.dropColumnFromSubtractions = function(colInd) {
+        $scope.subtractions.Columns.splice(colInd, 1);
+      };
+      $scope.updateColumnInSchema = function(colInd) {
+        if ($scope.schema.TableOption.DistKey.indexOf($scope.schema.Columns[colInd].OutboundName) > -1 ){
+          store.setError("Column selected for update is DistKey", undefined);
+          return false;
         }
+        if ($scope.schema.TableOption.SortKey.indexOf($scope.schema.Columns[colInd].OutboundName) > -1 ){
+          store.setError("Column selected for update is SortKey", undefined);
+          return false;
+        }
+        $scope.updates.Columns[colInd] = $scope.schema.Columns[colInd];
+      };
+      $scope.dropColumnFromUpdates = function(colInd) {
+        $scope.updates.Columns.splice(colInd, 1);
+        $scope.schema.Columns[colInd] = angular.copy($scope.schemaSource.Columns[colInd]);
+      };
+      $scope.inUpdates = function(column) {
+        return ($scope.updates.Columns.indexOf(column) != -1);
       };
       $scope.inSubtractions = function(column) {
         return ($scope.subtractions.Columns.indexOf(column) != -1);
@@ -213,7 +226,8 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       $scope.updateSchema = function() {
         var additions = $scope.additions;
         var subtractions = $scope.subtractions;
-        if (additions.Columns.length < 1 && (subtractions.Columns.length < 1)) {
+        var updates = $scope.updates;
+        if (additions.Columns.length < 1 && subtractions.Columns.length < 1 && updates.Columns.length < 1) {
           store.setError("No new column operations, so no action taken.", undefined);
           return false;
         }
@@ -233,6 +247,16 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
           migration.ColumnOperations.push(columnOperation);
         });
 
+        angular.forEach(updates.Columns, function(item, key) {
+          var columnOperation = {
+            Operation:           'update',
+            InboundName:         $scope.schemaSource.Columns[key].InboundName,
+            OutboundName:        $scope.schemaSource.Columns[key].OutboundName,
+            NewColumnDefinition: item
+          };
+          migration.ColumnOperations.push(columnOperation);
+        });
+
         angular.forEach(additions.Columns, function(item) {
           var columnOperation = {
             Operation:           'add',
@@ -247,7 +271,10 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
           $route.reload();
           store.setMessage("Succesfully updated schema: " +  additions.EventName);
         }, function(err) {
-          store.setError(err, undefined);
+          if (err.status >= 400 && err.status<500) {
+            $route.reload();
+          }
+          store.setError(err.data, undefined);
         });
       };
     });
