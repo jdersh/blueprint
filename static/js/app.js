@@ -12,7 +12,6 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       '/schemas', null,
       {all: {method: 'GET', isArray: true},
        get: {url: '/schema/:scope', method:'GET', isArray: true},
-       create: {url: '/schema/:event', method: 'POST', isArray: true},
        update: {url: '/schema/:event', method: 'POST', isArray: true}
       }
     );
@@ -157,6 +156,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       }
       $scope.schema = schema;
       $scope.additions = {Columns: [], EventName: schema.EventName}; // Used to hold new columns
+      $scope.subtractions = {Columns: [], EventName: schema.EventName};
       $scope.types = types;
       $scope.newCol = ColumnMaker.make();
       $scope.addColumnToSchema = function(column) {
@@ -185,10 +185,32 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       $scope.dropColumnFromAdditions = function(colInd) {
         $scope.additions.Columns.splice(colInd, 1);
       };
+      $scope.subColumnFromSchema = function(column) {
+        if ($scope.schema.TableOption.DistKey.indexOf(column.OutboundName) > -1 ){
+          store.setError("Column selected for removal is DistKey", undefined);
+          return false;
+        }
+        var index = $scope.subtractions.Columns.indexOf(column);
+        if (index > -1) {
+          store.setError("Column selected for removal is already subject for removal", undefined);
+          return false;
+        }
+        $scope.subtractions.Columns.push(column);
+      };
+      $scope.dropColumnFromSubtractions = function(column) {
+        var index = $scope.subtractions.Columns.indexOf(column);
+        if (index > -1) {
+          $scope.subtractions.Columns.splice(index, 1);
+        }
+      };
+      $scope.inSubtractions = function(column) {
+        return ($scope.subtractions.Columns.indexOf(column) > -1);
+      };
       $scope.updateSchema = function() {
         var additions = $scope.additions;
-        if (additions.Columns.length < 1) {
-          store.setError("No new columns, so no action taken.", undefined);
+        var subtractions = $scope.subtractions;
+        if (additions.Columns.length < 1 && (subtractions.Columns.length < 1)) {
+          store.setError("No new column operations, so no action taken.", undefined);
           return false;
         }
         var migration = {
@@ -197,6 +219,15 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
           ColumnOperations: [],
           TableOption: $scope.schema.TableOption
         };
+
+        angular.forEach(subtractions.Columns, function(item) {
+          var columnOperation = {
+            Operation:           'remove',
+            InboundName:         item.InboundName,
+            OutboundName:        item.OutboundName
+          };
+          migration.ColumnOperations.push(columnOperation);
+        });
 
         angular.forEach(additions.Columns, function(item) {
           var columnOperation = {
@@ -439,7 +470,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         
         var migration = makeTableCreateMigration($scope.event);
         if (migration === null) return;
-        Schema.create({event: $scope.event.EventName, version: 0}, 
+        Schema.update({event: $scope.event.EventName, version: 0}, 
                     migration, 
                     function() {
                       store.setMessage("Succesfully created schema: " + $scope.event.EventName);
