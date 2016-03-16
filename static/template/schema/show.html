@@ -9,7 +9,7 @@
       <th>Outbound</th>
       <th>Column Type</th>
       <th class="text-center">Column Options</th>
-      <th>&nbsp</th>
+      <th class="text-center">Action</th>
     </tr>
   </thead>
   <tbody>
@@ -22,7 +22,7 @@
       <div ng-if="!inSubtractions(c)">
         <button ng-click="subColumnFromSchema(c)"
                 type="button"
-                class="btn btn-warning btn-xs">Remove</button>
+                class="btn btn-danger btn-xs">Remove</button>
       </div>
       <div ng-if="inSubtractions(c)">
         <button ng-click="dropColumnFromSubtractions(c)"
@@ -31,17 +31,6 @@
       </div>
       </td>
     </tr>
-    <!-- <tr ng-repeat="c in subtractions.Columns">
-      <td>{{c.InboundName}}</td>
-      <td>{{c.OutboundName}}</td>
-      <td>{{c.Transformer}}</td>
-      <td class="text-center">{{c.ColumnCreationOptions}}</td>
-      <td class="text-center">
-        <button ng-click="dropColumnFromSubtractions(c)"
-                type="button"
-                class="btn btn-primary btn-xs">Re-Add</button>
-      </td>
-    </tr> -->
     <tr ng-repeat="c in additions.Columns">
       <td>{{c.InboundName}}</td>
       <td>{{c.OutboundName}}</td>
