@@ -16,19 +16,20 @@
   </thead>
   <tbody>
 
-    <tr ng-repeat="c in schema.Columns" ng-class="{danger: inSubtractions(c), warning: inUpdates(c)}">
+    <tr ng-repeat="c in schema.Columns" 
+        ng-class="{danger: inSubtractions(c), warning: inUpdates(c)}">
       <td>
         <div ng-if="!inUpdates(c)">{{c.InboundName}}</div>
         <div ng-if="inUpdates(c)">
           <input type="text"
-                 ng-model="updates.Columns[$index].InboundName"
+                 ng-model="updates.Columns[$index.toString()].InboundName"
                  name="inboundName"/>
         </div>
       </td>
       <td> 
         <div ng-if="!inUpdates(c)">{{c.OutboundName}}</div>
         <div ng-if="inUpdates(c)"><input type="text"
-                 ng-model="updates.Columns[$index].OutboundName"
+                 ng-model="updates.Columns[$index.toString()].OutboundName"
                  name="outboundName"/></div>
       </td>
       <td>{{c.Transformer}}</td>

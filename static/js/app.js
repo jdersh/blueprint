@@ -188,15 +188,16 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         $scope.additions.Columns.splice(colInd, 1);
       };
       $scope.subColumnFromSchema = function(colInd) {
-        if ($scope.schema.TableOption.DistKey.indexOf($scope.schema.Columns[colInd.toString()].OutboundName) > -1){
+        var strInd = colInd.toString();
+        if ($scope.schema.TableOption.DistKey.indexOf($scope.schema.Columns[strInd].OutboundName) > -1){
           store.setError("Column selected for remove is DistKey", undefined);
           return false;
         }
-        if ($scope.schema.TableOption.SortKey.indexOf($scope.schema.Columns[colInd.toString()].OutboundName) > -1){
+        if ($scope.schema.TableOption.SortKey.indexOf($scope.schema.Columns[strInd].OutboundName) > -1){
           store.setError("Column selected for remove is SortKey", undefined);
           return false;
         }
-        $scope.subtractions.Columns[colInd.toString()] = $scope.schema.Columns[colInd.toString()];
+        $scope.subtractions.Columns[strInd] = $scope.schema.Columns[strInd];
       };
       $scope.dropColumnFromSubtractions = function(colInd) {
         delete $scope.subtractions.Columns[colInd.toString()];
@@ -208,19 +209,21 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         return false;
       };
       $scope.updateColumnInSchema = function(colInd) {
-        if ($scope.schema.TableOption.DistKey.indexOf($scope.schema.Columns[colInd.toString()].OutboundName) > -1){
+        var strInd = colInd.toString();
+        if ($scope.schema.TableOption.DistKey.indexOf($scope.schema.Columns[strInd].OutboundName) > -1){
           store.setError("Column selected for update is DistKey", undefined);
           return false;
         }
-        if ($scope.schema.TableOption.SortKey.indexOf($scope.schema.Columns[colInd.toString()].OutboundName) > -1){
+        if ($scope.schema.TableOption.SortKey.indexOf($scope.schema.Columns[strInd].OutboundName) > -1){
           store.setError("Column selected for update is SortKey", undefined);
           return false;
         }
-        $scope.updates.Columns[colInd.toString()] = $scope.schema.Columns[colInd.toString()];
+        $scope.updates.Columns[strInd] = $scope.schema.Columns[strInd];
       };
       $scope.dropColumnFromUpdates = function(colInd) {
-        delete $scope.updates.Columns[colInd];
-        $scope.schema.Columns[colInd.toString()] = angular.copy($scope.originalSchema.Columns[colInd.toString()]);
+        var strInd = colInd.toString();
+        delete $scope.updates.Columns[strInd];
+        $scope.schema.Columns[strInd] = angular.copy($scope.originalSchema.Columns[strInd]);
       };
       $scope.inUpdates = function(column) {
         for (var key in $scope.updates.Columns) {
@@ -271,7 +274,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
           };
           migration.ColumnOperations.push(columnOperation);
         });
-
+        
         Schema.update({event: additions.EventName, version: $scope.schema.Version}, migration, function() {
           $route.reload();
           store.setMessage("Succesfully updated schema: " +  additions.EventName);
