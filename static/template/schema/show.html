@@ -34,38 +34,40 @@
       <td>{{c.Transformer}}</td>
       <td class="text-center">{{c.ColumnCreationOptions}}</td>
       <td class="text-center">
+        <button ng-if="!inSubtractions(c) && !inUpdates(c)"
+                ng-click="subColumnFromSchema($index)"
+                type="button"
+                class="btn btn-danger btn-xs"
+                style="float:right;">Remove</button>
 
-      <div style="float:right;" ng-if="!inSubtractions(c) && !inUpdates(c)">
-        <button ng-click="subColumnFromSchema($index)"
+        <button ng-if="inUpdates(c)"
+                ng-click="dropColumnFromUpdates($index)"
                 type="button"
-                class="btn btn-danger btn-xs">Remove</button>
-      </div>
-      <div ng-if="!inSubtractions(c) && inUpdates(c)">
-        <button ng-click="dropColumnFromUpdates($index)"
-                type="button"
-                class="btn btn-primary btn-xs">Cancel Update</button>
-      </div>
-      <div ng-if="inSubtractions(c)">
-        <button ng-click="dropColumnFromSubtractions($index)"
-                type="button"
-                class="btn btn-primary btn-xs">Re-Add</button>
-      </div>
-      <div style="float:left;" ng-if="!inSubtractions(c) && !inUpdates(c)">
-        <button ng-click="updateColumnInSchema($index)"
-                type="button"
-                class="btn btn-warning btn-xs">Update</button>
-      </div>
+                class="btn btn-primary btn-xs"
+                style="float:right;">Cancel Update</button>
 
+        <button ng-if="inSubtractions(c)"
+                ng-click="dropColumnFromSubtractions($index)"
+                type="button"
+                class="btn btn-primary btn-xs"
+                style="float:right;">Re-Add</button>
+
+        <button ng-if="!inSubtractions(c) && !inUpdates(c)"
+                ng-click="updateColumnInSchema($index)"
+                type="button"
+                class="btn btn-warning btn-xs"
+                style="float:left;">Update</button>
       </td>
     </tr>
-
-    <tr ng-repeat="c in additions.Columns">
+    <tr><td colspan="5"></td></tr>
+    <tr ng-repeat="c in additions.Columns" class="success">
       <td>{{c.InboundName}}</td>
       <td>{{c.OutboundName}}</td>
       <td>{{c.Transformer}}</td>
       <td class="text-center">{{c.ColumnCreationOptions}}</td>
-      <td class="text-center">
-        <button ng-click="dropColumnFromAdditions($index)"
+      <td class="text-center" >
+        <button style="float:right;"
+                ng-click="dropColumnFromAdditions($index)"
                 type="button"
                 class="btn btn-warning btn-xs">Remove</button>
       </td>
@@ -97,8 +99,9 @@
                ng-model="newCol.size"
                name="columnSize"/>
       </td>
-      <td class="text-center">
-        <button ng-click="addColumnToSchema(newCol)"
+      <td class="text-center" >
+        <button style="float:right;"
+                ng-click="addColumnToSchema(newCol)"
                 type="button"
                 class="btn btn-primary btn-sm">Add!</button>
       </td>
