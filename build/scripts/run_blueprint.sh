@@ -20,5 +20,6 @@ exec ./blueprint "$@"                                        \
   -transformConfig="${CONFIG_DIR}/transforms_available.json" \
   -requiredOrg=${REQUIRED_ORG}                               \
   -staticfiles="${SCIENCE_DIR}/nginx/html"                   \
-  -ingesterURL="${INGESTER_URL}"
-
+  -ingesterURL="${INGESTER_URL}"                             \
+  -postgresURL="${BLUEPRINT_DB_URL}"                         \
+  -postgresTableName="${BLUEPRINT_DB_TABLE_NAME}"
