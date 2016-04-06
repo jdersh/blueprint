@@ -12,7 +12,6 @@ aws s3 cp --region us-west-2 "$CONFIG_PREFIX/conf.sh" conf.sh
 source conf.sh
 
 exec ./blueprint "$@"                                        \
-  -scoopURL="${SCOOP_URL}"                                   \
   -cookieSecret=${COOKIE_SECRET}                             \
   -clientID=${CLIENT_ID}                                     \
   -clientSecret=${CLIENT_SECRET}                             \
