@@ -58,3 +58,9 @@ Either way your security group needs to allow access to port 22.
 
  * Improve these docs!
  * Improve build.sh!
+
+##WARNING
+
+In the vendor folder, mattn/go-sqlite3, the code folder is manually 
+added because go tools can't pick up the folder with only C files
+in it.  Once this issue is resolved, properly vendor the package.
