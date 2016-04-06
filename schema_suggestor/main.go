@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -20,15 +21,16 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/twitchscience/aws_utils/environment"
 	"github.com/twitchscience/aws_utils/listener"
+	"github.com/twitchscience/blueprint/bpdb"
 	"github.com/twitchscience/blueprint/schema_suggestor/processor"
-	cachingscoopclient "github.com/twitchscience/blueprint/scoopclient/cachingclient"
 )
 
 var (
-	scoopURL        = flag.String("url", "http://localhost:8080", "the url to talk to scoop")
-	staticFileDir   = flag.String("staticfiles", "./static/events", "the location to serve static files from")
-	transformConfig = flag.String("transformConfig", "transforms_available.json", "config for available transforms in spade")
-	env             = environment.GetCloudEnv()
+	postgresURL       = flag.String("postgresURL", "", "The login url for the postgres DB")
+	postgresTableName = flag.String("postgresTableName", "", "The name of the postgres table")
+	staticFileDir     = flag.String("staticfiles", "./static/events", "the location to serve static files from")
+	transformConfig   = flag.String("transformConfig", "transforms_available.json", "config for available transforms in spade")
+	env               = environment.GetCloudEnv()
 )
 
 // BPHandler listens to SQS for new messages describing freshly uploaded event data in S3.
@@ -80,7 +82,15 @@ func (handler *BPHandler) Handle(msg *sqs.Message) error {
 
 func main() {
 	flag.Parse()
-	scoopClient := cachingscoopclient.New(*scoopURL, *transformConfig)
+
+	pgConnection, err := sql.Open("postgres", *postgresURL)
+	if err != nil {
+		panic(err)
+	}
+	bpAdapter, err := bpdb.New(pgConnection, *postgresTableName)
+	if err != nil {
+		panic(err)
+	}
 
 	// SQS listener pools SQS queue and then kicks off a jobs to
 	// suggest the schemas.
@@ -93,7 +103,7 @@ func main() {
 			Router: processor.NewRouter(
 				*staticFileDir,
 				5*time.Minute,
-				scoopClient,
+				bpAdapter,
 			),
 			Downloader: s3manager.NewDownloader(session),
 		},
