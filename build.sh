@@ -17,6 +17,8 @@ sudo apt-get install -y pkg-config
 go get github.com/twitchscience/spade/transformer_dumper
 transformer_dumper -outFile build/config/transforms_available.json
 
+sudo apt-get install sqlite3 libsqlite3-dev
+
 export GOARCH=amd64
 export GOOS=linux
 export GOBIN="/tmp/${PROJECT}_build_$$"
