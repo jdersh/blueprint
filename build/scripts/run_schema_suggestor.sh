@@ -16,7 +16,6 @@ source conf.sh
 export GOMAXPROCS="2"
 
 exec ./schema_suggestor \
-  -transformConfig="${CONFIG_DIR}/transforms_available.json" \
   -staticfiles="${SCIENCE_DIR}/nginx/html/events"            \
   -postgresURL="${BLUEPRINT_DB_URL}"                         \
   -postgresTableName="${BLUEPRINT_DB_TABLE_NAME}"

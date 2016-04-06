@@ -29,7 +29,6 @@ var (
 	postgresURL       = flag.String("postgresURL", "", "The login url for the postgres DB")
 	postgresTableName = flag.String("postgresTableName", "", "The name of the postgres table")
 	staticFileDir     = flag.String("staticfiles", "./static/events", "the location to serve static files from")
-	transformConfig   = flag.String("transformConfig", "transforms_available.json", "config for available transforms in spade")
 	env               = environment.GetCloudEnv()
 )
 
