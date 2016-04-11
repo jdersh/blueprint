@@ -130,6 +130,7 @@ func (a *GithubAuth) User(r *http.Request) *AuthUser {
 			log.Printf("Failed to get membership: %v", err)
 			return nil
 		}
+		defer resp.Body.Close()
 
 		isMember = resp.StatusCode >= 200 && resp.StatusCode <= 299
 	}
