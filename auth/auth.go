@@ -71,11 +71,11 @@ func (a *GithubAuth) AuthorizeOrRedirect(h http.Handler) http.Handler {
 		}
 		//if the user is not MemberOfOrg,
 		//return "access forbidden"" error in HttpResponse
-		// do not redirect to LDAP loginURL, which will get into a endless loop
+		// do not redirect to LDAP loginURL, which will get into an endless loop
 		if user.IsMemberOfOrg == false {
-			log.Printf("A non-stats LDAP user tried to access\n")
 			errMsg := fmt.Sprintf("You need to be a member of %s organization",
 				a.RequiredOrg)
+			log.Println(errMsg)
 			http.Error(w, errMsg, http.StatusForbidden)
 			return
 		}
