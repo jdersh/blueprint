@@ -3,12 +3,14 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -131,6 +133,17 @@ func (s *server) createSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
+
+	blacklisted, err := s.isBlacklisted(cfg.EventName)
+	if err != nil {
+		log.Printf("Error testing %v in the blacklist: %v", cfg.EventName, err)
+		http.Error(w, err.Error(), 500)
+		return
+	} else if blacklisted {
+		http.Error(w, fmt.Sprintf("%v is blacklisted", cfg.EventName), 500)
+		return
+	}
+
 	err = s.datasource.CreateSchema(&cfg)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -140,6 +153,41 @@ func (s *server) createSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Error creating schema in bpdb, ignoring: %v", err)
 	}
+}
+
+func wildcard2Regex(pattern string) string {
+	var res string
+	res = strings.ToLower(pattern)
+	res = strings.Replace(res, ".", "\\.", -1)
+	res = strings.Replace(res, "*", ".*", -1)
+	res = strings.Replace(res, "?", ".+", -1)
+	res = "^" + res + "$"
+	return res
+}
+
+func (s *server) isBlacklisted(name string) (bool, error) {
+	var err error
+	blacklistJson, err := ioutil.ReadFile(s.blacklist)
+	if err != nil {
+		return true, err
+	}
+
+	var blacklist []string
+	err = json.Unmarshal(blacklistJson, &blacklist)
+	if err != nil {
+		return true, err
+	}
+
+	for _, pattern := range blacklist {
+		pattern := wildcard2Regex(pattern)
+		matched, err := regexp.Match(pattern, []byte(strings.ToLower(name)))
+		if err != nil {
+			return true, err
+		} else if matched {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {

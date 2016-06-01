@@ -21,5 +21,6 @@ exec ./blueprint "$@"                                        \
   -transformConfig="${CONFIG_DIR}/transforms_available.json" \
   -requiredOrg=${REQUIRED_ORG}                               \
   -staticfiles="${SCIENCE_DIR}/nginx/html"                   \
-  -ingesterURL="${INGESTER_URL}"
+  -ingesterURL="${INGESTER_URL}"                             \
+  -blacklist="${CONFIG_DIR}/blueprint_blacklist.json"
 
