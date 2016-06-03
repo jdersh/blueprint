@@ -11,7 +11,7 @@ func TestBlacklist(t *testing.T) {
 	s := &server{"", nil, nil, "this_file_should_not_exist.json"}
 	_, err = s.isBlacklisted("hello world")
 	if err == nil {
-		t.Errorf("The file %v should not exist and should return an error!", s.blacklist)
+		t.Errorf("The file %v should not exist and should return an error!", s.blacklistFilename)
 	}
 
 	var jsonFile *os.File
@@ -21,8 +21,8 @@ func TestBlacklist(t *testing.T) {
 	}
 	defer os.Remove(jsonFile.Name())
 
-	jsonFile.WriteString(`["wow", "logs.dfp_*", "logs.a?c_*"]`)
-	s.blacklist = jsonFile.Name()
+	jsonFile.WriteString(`["^wow$", "^logs\\.dfp_.*$", "^logs\\.a.c_.*$"]`)
+	s.blacklistFilename = jsonFile.Name()
 	err = jsonFile.Close()
 	if err != nil {
 		t.Errorf("%v", err)

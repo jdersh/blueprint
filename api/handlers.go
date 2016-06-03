@@ -123,30 +123,32 @@ func (s *server) createSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	var cfg scoop_protocol.Config
 	err = json.Unmarshal(b, &cfg)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	blacklisted, err := s.isBlacklisted(cfg.EventName)
 	if err != nil {
 		log.Printf("Error testing %v in the blacklist: %v", cfg.EventName, err)
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	} else if blacklisted {
-		http.Error(w, fmt.Sprintf("%v is blacklisted", cfg.EventName), 500)
+	}
+
+	if blacklisted {
+		http.Error(w, fmt.Sprintf("%v is blacklisted", cfg.EventName), http.StatusForbidden)
 		return
 	}
 
 	err = s.datasource.CreateSchema(&cfg)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	err = s.bpdbBackend.CreateSchema(&cfg)
@@ -155,35 +157,34 @@ func (s *server) createSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func wildcard2Regex(pattern string) string {
-	var res string
-	res = strings.ToLower(pattern)
-	res = strings.Replace(res, ".", "\\.", -1)
-	res = strings.Replace(res, "*", ".*", -1)
-	res = strings.Replace(res, "?", ".+", -1)
-	res = "^" + res + "$"
-	return res
-}
-
 func (s *server) isBlacklisted(name string) (bool, error) {
-	var err error
-	blacklistJson, err := ioutil.ReadFile(s.blacklist)
+	// Check whether name is blacklisted, case insensitive
+	// return true if name is blacklisted,
+	// return false when error occures or name is not blacklisted
+	blacklistJson, err := ioutil.ReadFile(s.blacklistFilename)
 	if err != nil {
-		return true, err
+		return false, err
 	}
 
 	var blacklist []string
+	var blacklistRe []*regexp.Regexp
+
 	err = json.Unmarshal(blacklistJson, &blacklist)
 	if err != nil {
-		return true, err
+		return false, err
 	}
 
 	for _, pattern := range blacklist {
-		pattern := wildcard2Regex(pattern)
-		matched, err := regexp.Match(pattern, []byte(strings.ToLower(name)))
+		re, err := regexp.Compile(strings.ToLower(pattern))
 		if err != nil {
-			return true, err
-		} else if matched {
+			return false, err
+		}
+		blacklistRe = append(blacklistRe, re)
+	}
+
+	name = strings.ToLower(name)
+	for _, pattern := range blacklistRe {
+		if matched := pattern.MatchString(name); matched {
 			return true, nil
 		}
 	}
@@ -204,21 +205,21 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	var req core.ClientUpdateSchemaRequest
 	err = json.Unmarshal(b, &req)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	req.EventName = eventName
 
 	err = s.datasource.UpdateSchema(&req)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	err = s.bpdbBackend.UpdateSchema(&req)
@@ -230,7 +231,7 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 func (s *server) allSchemas(w http.ResponseWriter, r *http.Request) {
 	cfgs, err := s.bpdbBackend.AllSchemas()
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeEvent(w, cfgs)
@@ -239,7 +240,7 @@ func (s *server) allSchemas(w http.ResponseWriter, r *http.Request) {
 func (s *server) schema(c web.C, w http.ResponseWriter, r *http.Request) {
 	cfg, err := s.bpdbBackend.Schema(c.URLParams["id"])
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if cfg == nil {
@@ -247,7 +248,7 @@ func (s *server) schema(c web.C, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeEvent(w, []scoop_protocol.Config{*cfg})
@@ -270,13 +271,13 @@ func (s *server) fileHandler(w http.ResponseWriter, r *http.Request) {
 func (s *server) types(w http.ResponseWriter, r *http.Request) {
 	props, err := s.datasource.PropertyTypes()
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	data := make(map[string][]string)
 	data["result"] = props
 	b, err := json.Marshal(data)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	_, err = w.Write(b)
@@ -297,7 +298,7 @@ func (s *server) expire(w http.ResponseWriter, r *http.Request) {
 func (s *server) listSuggestions(w http.ResponseWriter, r *http.Request) {
 	availableSuggestions, err := getAvailableSuggestions(s.docRoot)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -312,7 +313,7 @@ func (s *server) listSuggestions(w http.ResponseWriter, r *http.Request) {
 
 	b, err := json.Marshal(availableSuggestions)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
