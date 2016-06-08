@@ -13,11 +13,11 @@ import (
 )
 
 var (
-	scoopURL          = flag.String("scoopURL", "", "the base url for scoop")
-	bpdbConnection    = flag.String("bpdbConnection", "", "The connection string for blueprintdb")
-	staticFileDir     = flag.String("staticfiles", "./static", "the location to serve static files from")
-	transformConfig   = flag.String("transformConfig", "transforms_available.json", "config for available transforms in spade")
-	blacklistFilename = flag.String("blacklist", "blueprint_blacklist.json", "list of names that cannot be use as a new table")
+	scoopURL        = flag.String("scoopURL", "", "the base url for scoop")
+	bpdbConnection  = flag.String("bpdbConnection", "", "The connection string for blueprintdb")
+	staticFileDir   = flag.String("staticfiles", "./static", "the location to serve static files from")
+	transformConfig = flag.String("transformConfig", "transforms_available.json", "config for available transforms in spade")
+	configFilename  = flag.String("config", "conf.json", "Blueprint config file")
 )
 
 func main() {
@@ -27,7 +27,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error setting up blueprint db backend: %v.", err)
 	}
-	apiProcess := api.New(*staticFileDir, scoopClient, bpdbBackend, *blacklistFilename)
+	apiProcess := api.New(*staticFileDir, scoopClient, bpdbBackend, *configFilename)
 	manager := &core.SubprocessManager{
 		Processes: []core.Subprocess{
 			apiProcess,

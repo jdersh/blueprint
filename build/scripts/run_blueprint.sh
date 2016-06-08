@@ -9,6 +9,7 @@ eval "$(curl --silent 169.254.169.254/latest/user-data/)"
 export HOST="$(curl --silent 169.254.169.254/latest/meta-data/hostname)"
 export CONFIG_PREFIX="s3://$S3_CONFIG_BUCKET/$VPC_SUBNET_TAG/$CLOUD_APP/$CLOUD_ENVIRONMENT"
 aws s3 cp --region us-west-2 "$CONFIG_PREFIX/conf.sh" conf.sh
+aws s3 cp --region us-west-2 "$CONFIG_PREFIX/conf.json" conf.json
 source conf.sh
 
 exec ./blueprint "$@"                                        \
@@ -22,5 +23,5 @@ exec ./blueprint "$@"                                        \
   -requiredOrg=${REQUIRED_ORG}                               \
   -staticfiles="${SCIENCE_DIR}/nginx/html"                   \
   -ingesterURL="${INGESTER_URL}"                             \
-  -blacklist="${CONFIG_DIR}/blueprint_blacklist.json"
+  -config="${CONFIG_DIR}/conf.json"
 
