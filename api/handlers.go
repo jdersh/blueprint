@@ -2,6 +2,8 @@ package api
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +14,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/twitchscience/blueprint/auth"
@@ -157,32 +160,62 @@ func (s *server) createSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+var configChecksum string
+var blacklist []string
+var blacklistRe []*regexp.Regexp
+var mu sync.RWMutex
+
+// isBlacklisted check whether name matches (case insensitively) any regex in the blacklist.
+// It returns false when name is not blacklisted or an error occures.
 func (s *server) isBlacklisted(name string) (bool, error) {
-	// Check whether name is blacklisted, case insensitive
-	// return true if name is blacklisted,
-	// return false when error occures or name is not blacklisted
-	blacklistJson, err := ioutil.ReadFile(s.blacklistFilename)
+	configJson, err := ioutil.ReadFile(s.configFilename)
 	if err != nil {
 		return false, err
 	}
 
-	var blacklist []string
-	var blacklistRe []*regexp.Regexp
+	hasher := md5.New()
+	checksum := hex.EncodeToString(hasher.Sum(configJson))
 
-	err = json.Unmarshal(blacklistJson, &blacklist)
-	if err != nil {
-		return false, err
+	if checksum != configChecksum {
+		func() error {
+			mu.Lock()
+			defer mu.Unlock()
+			configChecksum = checksum
+			blacklist = nil
+			blacklistRe = nil
+
+			var jsonObj map[string][]string
+			err = json.Unmarshal(configJson, &jsonObj)
+			if err != nil {
+				return err
+			}
+
+			blacklist, ok := jsonObj["blacklist"]
+
+			if !ok {
+				err = fmt.Errorf("Cannot find blacklist in %v\n", s.configFilename)
+				return err
+			}
+
+			for _, pattern := range blacklist {
+				re, err := regexp.Compile(strings.ToLower(pattern))
+				if err != nil {
+					return err
+				}
+				blacklistRe = append(blacklistRe, re)
+			}
+			return nil
+		}()
 	}
 
-	for _, pattern := range blacklist {
-		re, err := regexp.Compile(strings.ToLower(pattern))
-		if err != nil {
-			return false, err
-		}
-		blacklistRe = append(blacklistRe, re)
+	if err != nil {
+		return false, err
 	}
 
 	name = strings.ToLower(name)
+
+	mu.RLock()
+	defer mu.RUnlock()
 	for _, pattern := range blacklistRe {
 		if matched := pattern.MatchString(name); matched {
 			return true, nil
