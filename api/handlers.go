@@ -2,8 +2,6 @@ package api
 
 import (
 	"bytes"
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/twitchscience/blueprint/auth"
@@ -160,51 +159,55 @@ func (s *server) createSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var configChecksum string
-var blacklist []string
+var mu sync.Mutex
 var blacklistRe []*regexp.Regexp
-var mu sync.RWMutex
+var blacklistCompiled uint32
+
+func compileRegex(filename string) error {
+	configJson, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+
+	blacklistRe = nil
+
+	var jsonObj map[string][]string
+	err = json.Unmarshal(configJson, &jsonObj)
+	if err != nil {
+		return err
+	}
+
+	blacklist, ok := jsonObj["blacklist"]
+
+	if !ok {
+		err = fmt.Errorf("Cannot find blacklist in %v\n", filename)
+		return err
+	}
+
+	for _, pattern := range blacklist {
+		re, err := regexp.Compile(strings.ToLower(pattern))
+		if err != nil {
+			return err
+		}
+		blacklistRe = append(blacklistRe, re)
+	}
+	return nil
+}
 
 // isBlacklisted check whether name matches (case insensitively) any regex in the blacklist.
 // It returns false when name is not blacklisted or an error occures.
 func (s *server) isBlacklisted(name string) (bool, error) {
-	configJson, err := ioutil.ReadFile(s.configFilename)
-	if err != nil {
-		return false, err
-	}
+	var err error
 
-	hasher := md5.New()
-	checksum := hex.EncodeToString(hasher.Sum(configJson))
-
-	if checksum != configChecksum {
-		func() error {
+	// use the similary idea in sync.Once.Do, but we want to return the error
+	if atomic.LoadUint32(&blacklistCompiled) == 0 {
+		func() {
 			mu.Lock()
 			defer mu.Unlock()
-			configChecksum = checksum
-			blacklist = nil
-			blacklistRe = nil
-
-			var jsonObj map[string][]string
-			err = json.Unmarshal(configJson, &jsonObj)
-			if err != nil {
-				return err
+			if blacklistCompiled == 0 {
+				defer atomic.StoreUint32(&blacklistCompiled, 1)
+				err = compileRegex(s.configFilename)
 			}
-
-			blacklist, ok := jsonObj["blacklist"]
-
-			if !ok {
-				err = fmt.Errorf("Cannot find blacklist in %v\n", s.configFilename)
-				return err
-			}
-
-			for _, pattern := range blacklist {
-				re, err := regexp.Compile(strings.ToLower(pattern))
-				if err != nil {
-					return err
-				}
-				blacklistRe = append(blacklistRe, re)
-			}
-			return nil
 		}()
 	}
 
@@ -214,8 +217,6 @@ func (s *server) isBlacklisted(name string) (bool, error) {
 
 	name = strings.ToLower(name)
 
-	mu.RLock()
-	defer mu.RUnlock()
 	for _, pattern := range blacklistRe {
 		if matched := pattern.MatchString(name); matched {
 			return true, nil
