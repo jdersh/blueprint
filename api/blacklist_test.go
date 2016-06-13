@@ -13,9 +13,17 @@ func TestBlacklist(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v", err)
 	}
-	defer os.Remove(jsonFile.Name())
+	defer func() {
+		err = os.Remove(jsonFile.Name())
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+	}()
 	s.configFilename = jsonFile.Name()
-	jsonFile.WriteString(`{ "blacklist": ["^wow$", "^logs\\.dfp_.*$", "^logs\\.a.c_.*$"] }`)
+	_, err = jsonFile.WriteString(`{ "blacklist": ["^wow$", "^logs\\.dfp_.*$", "^logs\\.a.c_.*$"] }`)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
 	err = jsonFile.Close()
 	if err != nil {
 		t.Errorf("%v", err)
