@@ -164,7 +164,7 @@ var blacklistRe []*regexp.Regexp
 var blacklistCompiled uint32
 
 func compileRegex(filename string) error {
-	configJson, err := ioutil.ReadFile(filename)
+	configJSON, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func compileRegex(filename string) error {
 	blacklistRe = nil
 
 	var jsonObj map[string][]string
-	err = json.Unmarshal(configJson, &jsonObj)
+	err = json.Unmarshal(configJSON, &jsonObj)
 	if err != nil {
 		return err
 	}
