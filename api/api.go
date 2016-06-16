@@ -12,6 +12,7 @@ import (
 	"github.com/zenazn/goji"
 	"github.com/zenazn/goji/graceful"
 	"github.com/zenazn/goji/web"
+	"github.com/zenazn/goji/web/middleware"
 )
 
 type server struct {
@@ -58,6 +59,12 @@ func (s *server) Setup() error {
 	healthcheck.Get("/health", s.healthCheck)
 
 	api := web.New()
+
+	// The default logger logs in colour which makes CloudWatch hard to read.
+	// Replace with a custom logger that does not use colour.
+	api.Abandon(middleware.Logger)
+	api.Use(SimpleLogger)
+
 	api.Use(jsonResponse)
 	api.Get("/schemas", s.allSchemas)
 	api.Get("/schema/:id", s.schema)
