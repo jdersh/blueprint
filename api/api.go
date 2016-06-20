@@ -3,7 +3,6 @@ package api
 
 import (
 	"flag"
-	"log"
 
 	"github.com/gorilla/context"
 	"github.com/twitchscience/blueprint/auth"
@@ -13,7 +12,6 @@ import (
 	"github.com/zenazn/goji"
 	"github.com/zenazn/goji/graceful"
 	"github.com/zenazn/goji/web"
-	"github.com/zenazn/goji/web/middleware"
 )
 
 type server struct {
@@ -63,12 +61,14 @@ func (s *server) Setup() error {
 
 	// The default logger logs in colour which makes CloudWatch hard to read.
 	// Replace with a custom logger that does not use colour.
-	err := api.Abandon(middleware.Logger)
+	/*err := api.Abandon(middleware.Logger)
 	if err != nil {
 		log.Printf("Could not abandon default logger, will continue as is: %s", err)
 	} else {
 		api.Use(SimpleLogger)
-	}
+	}*/
+
+	api.Use(SimpleLogger)
 
 	api.Use(jsonResponse)
 	api.Get("/schemas", s.allSchemas)
