@@ -65,7 +65,7 @@ func (s *server) Setup() error {
 	// Replace with a custom logger that does not use colour.
 	err := api.Abandon(middleware.Logger)
 	if err != nil {
-		log.Printf("Could not abandon default logger, will continue as is.")
+		log.Printf("Could not abandon default logger, will continue as is: %s", err)
 	} else {
 		api.Use(SimpleLogger)
 	}
