@@ -3,6 +3,7 @@ package api
 
 import (
 	"flag"
+	"log"
 
 	"github.com/gorilla/context"
 	"github.com/twitchscience/blueprint/auth"
@@ -62,8 +63,12 @@ func (s *server) Setup() error {
 
 	// The default logger logs in colour which makes CloudWatch hard to read.
 	// Replace with a custom logger that does not use colour.
-	api.Abandon(middleware.Logger)
-	api.Use(SimpleLogger)
+	err := api.Abandon(middleware.Logger)
+	if err != nil {
+		log.Printf("Could not abandon default logger, will continue as is.")
+	} else {
+		api.Use(SimpleLogger)
+	}
 
 	api.Use(jsonResponse)
 	api.Get("/schemas", s.allSchemas)
