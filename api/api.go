@@ -3,6 +3,7 @@ package api
 
 import (
 	"flag"
+	"log"
 
 	"github.com/gorilla/context"
 	"github.com/twitchscience/blueprint/auth"
@@ -12,6 +13,7 @@ import (
 	"github.com/zenazn/goji"
 	"github.com/zenazn/goji/graceful"
 	"github.com/zenazn/goji/web"
+	"github.com/zenazn/goji/web/middleware"
 )
 
 type server struct {
@@ -67,8 +69,12 @@ func (s *server) Setup() error {
 	} else {
 		api.Use(SimpleLogger)
 	}*/
+	err := healthcheck.Abandon(middleware.Logger)
+	if err != nil {
+		log.Printf("Could not abandon default logger, will continue as is: %s", err)
+	}
 
-	api.Use(SimpleLogger)
+	healthcheck.Use(SimpleLogger)
 
 	api.Use(jsonResponse)
 	api.Get("/schemas", s.allSchemas)
