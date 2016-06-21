@@ -1,7 +1,6 @@
 package web
 
 import (
-	"log"
 	"net/http"
 )
 
@@ -83,7 +82,6 @@ func (m *Mux) Insert(middleware, before MiddlewareType) error {
 // one is chosen. It is illegal to call this function concurrently with active
 // requests.
 func (m *Mux) Abandon(middleware MiddlewareType) error {
-	log.Printf("ABANDON: %v", m.ms)
 	return m.ms.Abandon(middleware)
 }
 

@@ -60,21 +60,6 @@ func (s *server) Setup() error {
 	healthcheck.Get("/health", s.healthCheck)
 
 	api := web.New()
-
-	// The default logger logs in colour which makes CloudWatch hard to read.
-	// Replace with a custom logger that does not use colour.
-	/*err := api.Abandon(middleware.Logger)
-	if err != nil {
-		log.Printf("Could not abandon default logger, will continue as is: %s", err)
-	} else {
-		api.Use(SimpleLogger)
-	}*/
-	err := goji.DefaultMux.Abandon(middleware.Logger)
-	if err != nil {
-		log.Printf("Could not abandon default logger, will continue as is: %s", err)
-	}
-	goji.DefaultMux.Use(SimpleLogger)
-
 	api.Use(jsonResponse)
 	api.Get("/schemas", s.allSchemas)
 	api.Get("/schema/:id", s.schema)
@@ -123,6 +108,15 @@ func (s *server) Setup() error {
 		goji.Handle("/*", files)
 	}
 	goji.NotFound(fourOhFour)
+
+	// The default logger logs in colour which makes CloudWatch hard to read.
+	// Replace with a custom logger that does not use colour.
+	err := goji.DefaultMux.Abandon(middleware.Logger)
+	if err != nil {
+		log.Printf("Could not abandon default logger, will continue as is: %s", err)
+	} else {
+		goji.DefaultMux.Use(SimpleLogger)
+	}
 
 	// Stop() provides our shutdown semantics
 	graceful.ResetSignals()
