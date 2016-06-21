@@ -2,9 +2,10 @@ package bpdb
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
-	_ "github.com/lib/pq" // To register "postgres" with database/sql
+	"github.com/lib/pq" // To register "postgres" with database/sql
 	"github.com/twitchscience/blueprint/core"
 	"github.com/twitchscience/scoop_protocol/scoop_protocol"
 )
@@ -87,6 +88,11 @@ func (p *postgresBackend) Migration(table string, to int) ([]*scoop_protocol.Ope
 }
 
 func (p *postgresBackend) UpdateSchema(req *core.ClientUpdateSchemaRequest) error {
+	err := preValidateUpdate(req, p)
+	if err != nil {
+		return fmt.Errorf("Invalid schema creation request: %v", err)
+	}
+
 	tx, err := p.db.Begin()
 	if err != nil {
 		return fmt.Errorf("Error beginning transaction for schema update: %v.", err)
@@ -126,6 +132,11 @@ func (p *postgresBackend) UpdateSchema(req *core.ClientUpdateSchemaRequest) erro
 }
 
 func (p *postgresBackend) CreateSchema(req *scoop_protocol.Config) error {
+	err := preValidateSchema(req)
+	if err != nil {
+		return fmt.Errorf("Invalid schema creation request: %v", err)
+	}
+
 	tx, err := p.db.Begin()
 	if err != nil {
 		return fmt.Errorf("Error beginning transaction for schema creation: %v.", err)
@@ -146,6 +157,11 @@ func (p *postgresBackend) CreateSchema(req *scoop_protocol.Config) error {
 			rollErr := tx.Rollback()
 			if rollErr != nil {
 				return fmt.Errorf("Error rolling back commit: %v.", rollErr)
+			}
+			if pqErr, ok := err.(*pq.Error); ok {
+				if pqErr.Code.Name() == "unique_violation" { // pkey violation, meaning table already exists
+					return errors.New("table already exists")
+				}
 			}
 			return fmt.Errorf("Error INSERTing row for new column on %s: %v", req.EventName, err)
 		}

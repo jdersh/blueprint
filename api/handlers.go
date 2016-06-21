@@ -155,9 +155,11 @@ func (s *server) createSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 
 	err = s.datasource.CreateSchema(&cfg)
 	if err != nil {
+		log.Printf("Error creating schema: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	err = s.bpdbBackend.CreateSchema(&cfg)
 	if err != nil {
 		logger.WithError(err).Error("Failed to create schema in bpdb, ignoring")
