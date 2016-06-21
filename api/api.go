@@ -69,12 +69,11 @@ func (s *server) Setup() error {
 	} else {
 		api.Use(SimpleLogger)
 	}*/
-	err := healthcheck.Abandon(middleware.Logger)
+	err := goji.DefaultMux.Abandon(middleware.Logger)
 	if err != nil {
 		log.Printf("Could not abandon default logger, will continue as is: %s", err)
 	}
-
-	healthcheck.Use(SimpleLogger)
+	goji.DefaultMux.Use(SimpleLogger)
 
 	api.Use(jsonResponse)
 	api.Get("/schemas", s.allSchemas)
