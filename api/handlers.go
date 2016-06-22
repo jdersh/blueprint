@@ -61,7 +61,7 @@ func (s *server) ingest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fields := map[string]interface{} { "table": tableArg.Table }
+	fields := map[string]interface{}{"table": tableArg.Table}
 	if enableAuth {
 		a := auth.New(githubServer,
 			clientID,
@@ -153,30 +153,25 @@ func (s *server) createSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = s.datasource.CreateSchema(&cfg)
-	if err != nil {
-		log.Printf("Error creating schema: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	err = s.bpdbBackend.CreateSchema(&cfg)
 	if err != nil {
-		logger.WithError(err).Error("Failed to create schema in bpdb, ignoring")
+		logger.WithError(err).Error("Error creating schema.")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
 var (
-	blacklistOnce	sync.Once
-	blacklistRe	[]*regexp.Regexp
-	blacklistErr	error
+	blacklistOnce sync.Once
+	blacklistRe   []*regexp.Regexp
+	blacklistErr  error
 )
 
 // isBlacklisted check whether name matches any regex in the blacklist (case insensitive).
 // It returns false when name is not blacklisted or an error occurs.
 // TODO(clgroft): should this be per-server? Currently it's global.
 func (s *server) isBlacklisted(name string) (bool, error) {
-	blacklistOnce.Do(func () {
+	blacklistOnce.Do(func() {
 		var configJSON []byte
 		configJSON, blacklistErr = ioutil.ReadFile(s.configFilename)
 		if blacklistErr != nil {
@@ -245,14 +240,11 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 	}
 	req.EventName = eventName
 
-	err = s.datasource.UpdateSchema(&req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	err = s.bpdbBackend.UpdateSchema(&req)
 	if err != nil {
-		logger.WithError(err).Error("Failed to update schema in bpdb, ignoring")
+		logger.WithError(err).Error("Error updating schema.")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
