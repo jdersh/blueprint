@@ -13,8 +13,6 @@ SECURITY_GROUP=$6
 # I hate boolean args, but I'm not sure how to handle this.
 USE_PRIVATE_IP=${7:-"false"}
 
-sudo apt-get install -y pkg-config
-
 export GOARCH=amd64
 export GOOS=linux
 export GOBIN="/tmp/${PROJECT}_build_$$"
