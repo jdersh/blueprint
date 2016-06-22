@@ -27,7 +27,7 @@ var (
 	loginURL        = "/login"
 	logoutURL       = "/logout"
 	authCallbackURL = "/github_oauth_cb"
-	enable_auth     bool
+	enableAuth      bool
 	readonly        bool
 	cookieSecret    string
 	clientID        string
@@ -38,7 +38,7 @@ var (
 )
 
 func init() {
-	flag.BoolVar(&enable_auth, "enable_auth", true, "enable authentication when not in readonly mode")
+	flag.BoolVar(&enableAuth, "enable_auth", true, "enable authentication when not in readonly mode")
 	flag.BoolVar(&readonly, "readonly", false, "run in readonly mode and disable auth")
 	flag.StringVar(&cookieSecret, "cookieSecret", "", "32 character secret for signing cookies")
 	flag.StringVar(&clientID, "clientID", "", "Google API client id")
@@ -100,7 +100,7 @@ func (s *server) Setup() error {
 
 		goji.Handle("/*", files)
 
-		if enable_auth {
+		if enableAuth {
 			a := auth.New(githubServer,
 				clientID,
 				clientSecret,
