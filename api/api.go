@@ -4,8 +4,6 @@ package api
 import (
 	"flag"
 	"log"
-	"os"
-	"strings"
 
 	"github.com/gorilla/context"
 	"github.com/twitchscience/blueprint/auth"
@@ -29,7 +27,7 @@ var (
 	loginURL        = "/login"
 	logoutURL       = "/logout"
 	authCallbackURL = "/github_oauth_cb"
-	noauth          bool
+	enable_auth     bool
 	readonly        bool
 	cookieSecret    string
 	clientID        string
@@ -40,6 +38,7 @@ var (
 )
 
 func init() {
+	flag.BoolVar(&enable_auth, "enable_auth", true, "enable authentication when not in readonly mode")
 	flag.BoolVar(&readonly, "readonly", false, "run in readonly mode and disable auth")
 	flag.StringVar(&cookieSecret, "cookieSecret", "", "32 character secret for signing cookies")
 	flag.StringVar(&clientID, "clientID", "", "Google API client id")
@@ -47,8 +46,6 @@ func init() {
 	flag.StringVar(&githubServer, "githubServer", "http://github.com", "Github server to use for auth")
 	flag.StringVar(&requiredOrg, "requiredOrg", "", "Org user need to belong to to use auth")
 	flag.StringVar(&ingesterURL, "ingesterURL", "", "URL to the ingester")
-
-	noauth = strings.HasPrefix(os.Getenv("CLOUD_ENVIRONMENT"), "integration")
 }
 
 // New returns an API process.
@@ -101,7 +98,7 @@ func (s *server) Setup() error {
 		files.Get("/*", s.fileHandler)
 		files.Use(context.ClearHandler)
 
-		if !noauth {
+		if enable_auth {
 			a := auth.New(githubServer,
 				clientID,
 				clientSecret,

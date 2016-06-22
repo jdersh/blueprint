@@ -62,7 +62,7 @@ func (s *server) ingest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !noauth {
+	if enable_auth {
 		a := auth.New(githubServer,
 			clientID,
 			clientSecret,
