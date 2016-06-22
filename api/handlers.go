@@ -18,8 +18,8 @@ import (
 	"github.com/twitchscience/aws_utils/logger"
 	"github.com/twitchscience/blueprint/auth"
 	"github.com/twitchscience/blueprint/core"
-	cachingscoopclient "github.com/twitchscience/blueprint/scoopclient/cachingclient"
 	"github.com/twitchscience/scoop_protocol/scoop_protocol"
+	"github.com/twitchscience/scoop_protocol/transformer"
 
 	"github.com/zenazn/goji/web"
 )
@@ -327,12 +327,8 @@ func (s *server) fileHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) types(w http.ResponseWriter, r *http.Request) {
-	props, err := s.datasource.PropertyTypes()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
 	data := make(map[string][]string)
-	data["result"] = props
+	data["result"] = transformer.ValidTransforms
 	b, err := json.Marshal(data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -343,13 +339,6 @@ func (s *server) types(w http.ResponseWriter, r *http.Request) {
 		logger.WithError(err).Error("Failed to write to response")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-}
-
-func (s *server) expire(w http.ResponseWriter, r *http.Request) {
-	v := s.datasource.(*cachingscoopclient.CachingClient)
-	if v != nil {
-		v.Expire()
 	}
 }
 
