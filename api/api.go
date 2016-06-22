@@ -38,7 +38,7 @@ var (
 )
 
 func init() {
-	flag.BoolVar(&enableAuth, "enable_auth", true, "enable authentication when not in readonly mode")
+	flag.BoolVar(&enableAuth, "enableAuth", true, "enable authentication when not in readonly mode")
 	flag.BoolVar(&readonly, "readonly", false, "run in readonly mode and disable auth")
 	flag.StringVar(&cookieSecret, "cookieSecret", "", "32 character secret for signing cookies")
 	flag.StringVar(&clientID, "clientID", "", "Google API client id")
