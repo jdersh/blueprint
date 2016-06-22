@@ -4,6 +4,8 @@ package api
 import (
 	"flag"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/gorilla/context"
 	"github.com/twitchscience/blueprint/auth"
@@ -27,6 +29,7 @@ var (
 	loginURL        = "/login"
 	logoutURL       = "/logout"
 	authCallbackURL = "/github_oauth_cb"
+	noauth          bool
 	readonly        bool
 	cookieSecret    string
 	clientID        string
@@ -44,6 +47,8 @@ func init() {
 	flag.StringVar(&githubServer, "githubServer", "http://github.com", "Github server to use for auth")
 	flag.StringVar(&requiredOrg, "requiredOrg", "", "Org user need to belong to to use auth")
 	flag.StringVar(&ingesterURL, "ingesterURL", "", "URL to the ingester")
+
+	noauth = strings.HasPrefix(os.Getenv("CLOUD_ENVIRONMENT"), "integration")
 }
 
 // New returns an API process.
@@ -79,14 +84,6 @@ func (s *server) Setup() error {
 	goji.Handle("/types", api)
 
 	if !readonly {
-		a := auth.New(githubServer,
-			clientID,
-			clientSecret,
-			cookieSecret,
-			requiredOrg,
-			loginURL)
-
-		api.Use(a.AuthorizeOrForbid)
 		api.Use(context.ClearHandler)
 
 		api.Post("/ingest", s.ingest)
@@ -100,14 +97,26 @@ func (s *server) Setup() error {
 		goji.Handle("/schema", api)
 		goji.Handle("/removesuggestion/*", api)
 
-		goji.Handle(loginURL, a.LoginHandler)
-		goji.Handle(logoutURL, a.LogoutHandler)
-		goji.Handle(authCallbackURL, a.AuthCallbackHandler)
-
 		files := web.New()
 		files.Get("/*", s.fileHandler)
-		files.Use(a.AuthorizeOrRedirect)
 		files.Use(context.ClearHandler)
+
+		if !noauth {
+			a := auth.New(githubServer,
+				clientID,
+				clientSecret,
+				cookieSecret,
+				requiredOrg,
+				loginURL)
+
+			api.Use(a.AuthorizeOrForbid)
+
+			goji.Handle(loginURL, a.LoginHandler)
+			goji.Handle(logoutURL, a.LogoutHandler)
+			goji.Handle(authCallbackURL, a.AuthCallbackHandler)
+
+			files.Use(a.AuthorizeOrRedirect)
+		}
 
 		goji.Handle("/*", files)
 	}
