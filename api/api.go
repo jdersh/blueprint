@@ -95,10 +95,7 @@ func (s *server) Setup() error {
 		goji.Handle("/removesuggestion/*", api)
 
 		files := web.New()
-		files.Get("/*", s.fileHandler)
 		files.Use(context.ClearHandler)
-
-		goji.Handle("/*", files)
 
 		if enableAuth {
 			a := auth.New(githubServer,
@@ -116,6 +113,9 @@ func (s *server) Setup() error {
 
 			files.Use(a.AuthorizeOrRedirect)
 		}
+
+		goji.Handle("/*", files)
+		files.Get("/*", s.fileHandler)
 	}
 	goji.NotFound(fourOhFour)
 
