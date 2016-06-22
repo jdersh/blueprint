@@ -14,8 +14,6 @@ SECURITY_GROUP=$6
 USE_PRIVATE_IP=${7:-"false"}
 
 sudo apt-get install -y pkg-config
-go get github.com/twitchscience/spade/transformer_dumper
-transformer_dumper -outFile build/config/transforms_available.json
 
 export GOARCH=amd64
 export GOOS=linux
