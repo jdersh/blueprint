@@ -47,9 +47,9 @@ type Bpdb interface {
 	Migration(table string, to int) ([]*scoop_protocol.Operation, error)
 }
 
-func validateType(type_ string) error {
+func validateType(t string) error {
 	for _, validType := range transformer.ValidTransforms {
-		if validType == type_ {
+		if validType == t {
 			return nil
 		}
 	}

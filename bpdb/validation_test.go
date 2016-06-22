@@ -47,7 +47,7 @@ func TestPreValidateSchemaOkay(t *testing.T) {
 	}
 	err := preValidateSchema(&cfg)
 	if err != nil {
-		t.Error("Expected no error on valid schema, got %v.", err)
+		t.Errorf("Expected no error on valid schema, got %v.", err)
 	}
 }
 
@@ -122,6 +122,6 @@ func TestValidateIdentifierReservedWord(t *testing.T) {
 func TestValidateIdentifierValid(t *testing.T) {
 	err := validateIdentifier("minute-watched")
 	if err != nil {
-		t.Error("Expected no error on valid identifier, got %v.", err)
+		t.Errorf("Expected no error on valid identifier, got %v.", err)
 	}
 }

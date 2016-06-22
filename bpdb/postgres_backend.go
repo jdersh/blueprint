@@ -77,10 +77,12 @@ func (p *postgresBackend) Migration(table string, to int) ([]*scoop_protocol.Ope
 	ops := []*scoop_protocol.Operation{}
 	for rows.Next() {
 		var op scoop_protocol.Operation
-		err := rows.Scan(&op.Action, &op.Inbound, &op.Outbound, &op.ColumnType, &op.ColumnOptions)
+		var action string
+		err := rows.Scan(&action, &op.Inbound, &op.Outbound, &op.ColumnType, &op.ColumnOptions)
 		if err != nil {
 			return nil, fmt.Errorf("Error parsing operation row: %v.", err)
 		}
+		op.Action = scoop_protocol.Action(action)
 
 		ops = append(ops, &op)
 	}
