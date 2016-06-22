@@ -112,13 +112,6 @@ func TestValidateIdentifierBadCharacters(t *testing.T) {
 	}
 }
 
-func TestValidateIdentifierReservedWord(t *testing.T) {
-	err := validateIdentifier("from")
-	if err == nil {
-		t.Error("Expected error on redshift reserved word as identifier.")
-	}
-}
-
 func TestValidateIdentifierValid(t *testing.T) {
 	err := validateIdentifier("minute-watched")
 	if err != nil {

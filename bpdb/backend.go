@@ -3,7 +3,6 @@ package bpdb
 import (
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/twitchscience/blueprint/core"
 	"github.com/twitchscience/scoop_protocol/scoop_protocol"
@@ -11,22 +10,6 @@ import (
 )
 
 // redshiftReservedWords from http://docs.aws.amazon.com/redshift/latest/dg/r_pg_keywords.html
-var redshiftReservedWords = []string{"AES128", "AES256", "ALL", "ALLOWOVERWRITE", "ANALYSE", "ANALYZE", "AND",
-	"ANY", "ARRAY", "AS", "ASC", "AUTHORIZATION", "BACKUP", "BETWEEN", "BINARY", "BLANKSASNULL", "BOTH",
-	"BYTEDICT", "BZIP2", "CASE", "CAST", "CHECK", "COLLATE", "COLUMN", "CONSTRAINT", "CREATE", "CREDENTIALS",
-	"CROSS", "CURRENT_DATE", "CURRENT_TIME", "CURRENT_TIMESTAMP", "CURRENT_USER", "CURRENT_USER_ID", "DEFAULT",
-	"DEFERRABLE", "DEFLATE", "DEFRAG", "DELTA", "DELTA32K", "DESC", "DISABLE", "DISTINCT", "DO", "ELSE",
-	"EMPTYASNULL", "ENABLE", "ENCODE", "ENCRYPT", "ENCRYPTION", "END", "EXCEPT", "EXPLICIT", "FALSE",
-	"FOR", "FOREIGN", "FREEZE", "FROM", "FULL", "GLOBALDICT256", "GLOBALDICT64K", "GRANT", "GROUP", "GZIP",
-	"HAVING", "IDENTITY", "IGNORE", "ILIKE", "IN", "INITIALLY", "INNER", "INTERSECT", "INTO", "IS", "ISNULL",
-	"JOIN", "LEADING", "LEFT", "LIKE", "LIMIT", "LOCALTIME", "LOCALTIMESTAMP", "LUN", "LUNS", "LZO", "LZOP",
-	"MINUS", "MOSTLY13", "MOSTLY32", "MOSTLY8", "NATURAL", "NEW", "NOT", "NOTNULL", "NULL", "NULLS", "OFF",
-	"OFFLINE", "OFFSET", "OLD", "ON", "ONLY", "OPEN", "OR", "ORDER", "OUTER", "OVERLAPS", "PARALLEL", "PARTITION",
-	"PERCENT", "PERMISSIONS", "PLACING", "PRIMARY", "RAW", "READRATIO", "RECOVER", "REFERENCES", "RESPECT",
-	"REJECTLOG", "RESORT", "RESTORE", "RIGHT", "SELECT", "SESSION_USER", "SIMILAR", "SOME", "SYSDATE", "SYSTEM",
-	"TABLE", "TAG", "TDES", "TEXT255", "TEXT32K", "THEN", "TIMESTAMP", "TO", "TOP", "TRAILING", "TRUE",
-	"TRUNCATECOLUMNS", "UNION", "UNIQUE", "USER", "USING", "VERBOSE", "WALLET", "WHEN", "WHERE", "WITH",
-	"WITHOUT"}
 var maxColumns = 300
 
 // Operation represents a single change to a schema
@@ -63,12 +46,6 @@ func validateIdentifier(name string) error {
 	matched, _ := regexp.MatchString(`^[A-Za-z_][A-Za-z_-]*$`, name)
 	if !matched {
 		return fmt.Errorf("must begin with alpha or underscore and be composed of alphanumeric, underscore, or hyphen")
-	}
-	upper := strings.ToUpper(name)
-	for _, reservedWord := range redshiftReservedWords {
-		if upper == reservedWord {
-			return fmt.Errorf("%s is a redshift reserved word", reservedWord)
-		}
 	}
 	return nil
 }
