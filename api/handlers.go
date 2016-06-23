@@ -72,7 +72,7 @@ func (s *server) ingest(w http.ResponseWriter, r *http.Request) {
 		user := a.User(r)
 		log.Printf("%s requested table %s be flushed.", user.Name, tableArg.Table)
 	} else {
-		log.Printf("%s requested table %s be flushed.", "User", tableArg.Table)
+		log.Printf("Flushing table %s with no user authenticated", tableArg.Table)
 	}
 
 	js, err := json.Marshal(tableArg)
