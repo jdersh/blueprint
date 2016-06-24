@@ -1,6 +1,7 @@
 {
 	"ImportPath": "github.com/twitchscience/blueprint",
 	"GoVersion": "go1.6",
+	"GodepVersion": "v61",
 	"Packages": [
 		"./..."
 	],
@@ -69,7 +70,7 @@
 		},
 		{
 			"ImportPath": "github.com/twitchscience/aws_utils/listener",
-			"Rev": "3980012000857fb8c398971acd24c14271811162"
+			"Rev": "d54870e0fca2f2f6a16cc4f98dc28a3d4ece8c2a"
 		},
 		{
 			"ImportPath": "github.com/twitchscience/scoop_protocol/msg_signer",
