@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 
+	_ "github.com/twitchscience/aws_utils/logger"
 	"github.com/twitchscience/blueprint/api"
 	"github.com/twitchscience/blueprint/bpdb"
 	"github.com/twitchscience/blueprint/core"
