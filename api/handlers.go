@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"path"
@@ -128,6 +129,7 @@ func (s *server) createSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
+		log.Printf("Error reading body of request in creatSchema: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -135,6 +137,7 @@ func (s *server) createSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 	var cfg scoop_protocol.Config
 	err = json.Unmarshal(b, &cfg)
 	if err != nil {
+		log.Printf("Error getting marshalling config to json: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -228,6 +231,7 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
+		log.Printf("Error reading request body in updateSchema: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -235,6 +239,7 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 	var req core.ClientUpdateSchemaRequest
 	err = json.Unmarshal(b, &req)
 	if err != nil {
+		log.Printf("Error unmarshalling request body in updateSchema: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -251,6 +256,7 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 func (s *server) allSchemas(w http.ResponseWriter, r *http.Request) {
 	cfgs, err := s.bpdbBackend.AllSchemas()
 	if err != nil {
+		log.Printf("Error retrieving allSchemas: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -260,15 +266,12 @@ func (s *server) allSchemas(w http.ResponseWriter, r *http.Request) {
 func (s *server) schema(c web.C, w http.ResponseWriter, r *http.Request) {
 	cfg, err := s.bpdbBackend.Schema(c.URLParams["id"])
 	if err != nil {
+		log.Printf("Error retrieving schemas %s: %v", c.URLParams["id"], err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if cfg == nil {
 		fourOhFour(w, r)
-		return
-	}
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeEvent(w, []scoop_protocol.Config{*cfg})
@@ -299,6 +302,7 @@ func (s *server) migration(c web.C, w http.ResponseWriter, r *http.Request) {
 	}
 	b, err := json.Marshal(operations)
 	if err != nil {
+		log.Printf("Error getting marshalling operations to json: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -331,6 +335,7 @@ func (s *server) types(w http.ResponseWriter, r *http.Request) {
 	data["result"] = transformer.ValidTransforms
 	b, err := json.Marshal(data)
 	if err != nil {
+		log.Printf("Error getting marshalling data to json: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -345,6 +350,7 @@ func (s *server) types(w http.ResponseWriter, r *http.Request) {
 func (s *server) listSuggestions(w http.ResponseWriter, r *http.Request) {
 	availableSuggestions, err := getAvailableSuggestions(s.docRoot)
 	if err != nil {
+		log.Printf("Error listing suggestions: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -360,6 +366,7 @@ func (s *server) listSuggestions(w http.ResponseWriter, r *http.Request) {
 
 	b, err := json.Marshal(availableSuggestions)
 	if err != nil {
+		log.Printf("Error getting marshalling suggestions to json: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -368,6 +375,7 @@ func (s *server) listSuggestions(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.WithError(err).Error("Failed to write to response")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 

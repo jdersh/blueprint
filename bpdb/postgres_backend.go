@@ -216,7 +216,7 @@ func (p *postgresBackend) Schema(name string) (*scoop_protocol.Config, error) {
 
 	schemas, err := generateSchemas(ops)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Internal state bad - Error generating schemas from operations: %v", err)
 	}
 	if len(schemas) > 1 {
 		return nil, fmt.Errorf("Expected only one schema, received %v.", len(schemas))
