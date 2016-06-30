@@ -104,7 +104,7 @@ func (e *EventRouter) ReadFile(filename string) error {
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			logger.WithError(err).Fatal("Decoding error")
+			logger.WithError(err).Fatal("Decoding event error")
 		}
 		e.Route(event.Event, event.Properties)
 	}
