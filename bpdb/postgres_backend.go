@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/lib/pq"
 	"github.com/twitchscience/blueprint/core"
@@ -75,6 +76,12 @@ func (p *postgresBackend) Migration(table string, to int) ([]*scoop_protocol.Ope
 		return nil, fmt.Errorf("Error querying for migration (%s) to v%v: %v.", table, to, err)
 	}
 	ops := []*scoop_protocol.Operation{}
+	defer func() {
+		err := rows.Close()
+		if err != nil {
+			log.Printf("Error closing rows in postgres backend Migration: %v", err)
+		}
+	}()
 	for rows.Next() {
 		var op scoop_protocol.Operation
 		var action string
@@ -178,6 +185,12 @@ func (p *postgresBackend) CreateSchema(req *scoop_protocol.Config) error {
 // scanOperationRows scans the rows into operationRow objects
 func scanOperationRows(rows *sql.Rows) ([]operationRow, error) {
 	ops := []operationRow{}
+	defer func() {
+		err := rows.Close()
+		if err != nil {
+			log.Printf("Error closing rows in postgres backend Migration: %v", err)
+		}
+	}()
 	for rows.Next() {
 		var op operationRow
 		err := rows.Scan(&op.event, &op.action, &op.inbound, &op.outbound, &op.columnType, &op.columnOptions, &op.version, &op.ordering)
