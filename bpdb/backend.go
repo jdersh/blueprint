@@ -79,7 +79,7 @@ func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
 
 	// Validate schema "add"s
 	for _, col := range req.Additions {
-		err := validateIdentifier(col.OutboundName)
+		err = validateIdentifier(col.OutboundName)
 		if err != nil {
 			return fmt.Errorf("Column outbound name invalid, %v", err)
 		}
