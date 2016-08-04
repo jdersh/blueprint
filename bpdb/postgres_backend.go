@@ -114,7 +114,7 @@ func (p *postgresBackend) UpdateSchema(req *core.ClientUpdateSchemaRequest) erro
 		return fmt.Errorf("Error parsing response for version number for %s: %v.", req.EventName, err)
 	}
 
-	for i, col := range req.Columns {
+	for i, col := range req.Additions {
 		_, err = tx.Exec(addColumnQuery,
 			req.EventName,
 			"add",
@@ -133,6 +133,27 @@ func (p *postgresBackend) UpdateSchema(req *core.ClientUpdateSchemaRequest) erro
 			return fmt.Errorf("Error INSERTing row for new column on %s: %v", req.EventName, err)
 		}
 	}
+
+	for i, col := range req.Drops {
+		_, err = tx.Exec(addColumnQuery,
+			req.EventName,
+			"delete",
+			col.InboundName,
+			col.OutboundName,
+			col.Transformer,
+			col.Length,
+			newVersion,
+			len(req.Additions)+i,
+		)
+		if err != nil {
+			rollErr := tx.Rollback()
+			if rollErr != nil {
+				return fmt.Errorf("Error rolling back commit: %v.", rollErr)
+			}
+			return fmt.Errorf("Error INSERTing row for drop column on %s: %v", req.EventName, err)
+		}
+	}
+
 	err = tx.Commit()
 	if err != nil {
 		return fmt.Errorf("Error commiting schema update for %s: %v", req.EventName, err)

@@ -72,7 +72,13 @@ func preValidateSchema(cfg *scoop_protocol.Config) error {
 }
 
 func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
-	for _, col := range req.Columns {
+	schema, err := bpdb.Schema(req.EventName)
+	if err != nil {
+		return fmt.Errorf("Error getting schema to validate schema update: %v", err)
+	}
+
+	// Validate schema "add"s
+	for _, col := range req.Additions {
 		err := validateIdentifier(col.OutboundName)
 		if err != nil {
 			return fmt.Errorf("Column outbound name invalid, %v", err)
@@ -82,11 +88,7 @@ func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
 			return fmt.Errorf("Column transformer invalid, %v", err)
 		}
 	}
-	schema, err := bpdb.Schema(req.EventName)
-	if err != nil {
-		return fmt.Errorf("Error getting schema to validate schema update: %v", err)
-	}
-	for _, col := range req.Columns {
+	for _, col := range req.Additions {
 		err = ApplyOperation(schema, Operation{
 			action:        "add",
 			inbound:       col.InboundName,
@@ -95,11 +97,26 @@ func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
 			columnOptions: col.Length,
 		})
 		if err != nil {
-			return fmt.Errorf("Error applying operations to table: %v", err)
+			return fmt.Errorf("Error applying operations add to table: %v", err)
 		}
 	}
+
+	// Validate schema "delete"s
+	for _, col := range req.Drops {
+		err = ApplyOperation(schema, Operation{
+			action:        "delete",
+			inbound:       col.InboundName,
+			outbound:      col.OutboundName,
+			columnType:    col.Transformer,
+			columnOptions: col.Length,
+		})
+		if err != nil {
+			return fmt.Errorf("Error applying operations drop to table: %v", err)
+		}
+	}
+
 	if len(schema.Columns) > maxColumns {
-		return fmt.Errorf("Too many columns, max is %d, given %d new, which would result in %d total.", maxColumns, len(req.Columns), len(schema.Columns))
+		return fmt.Errorf("Too many columns, max is %d, given %d adds and %d drops, which would result in %d total.", maxColumns, len(req.Additions), len(req.Drops), len(schema.Columns))
 	}
 	return nil
 }
