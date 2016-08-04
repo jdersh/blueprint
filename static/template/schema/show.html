@@ -18,7 +18,18 @@
       <td>{{c.OutboundName}}</td>
       <td>{{c.Transformer}}</td>
       <td class="text-center">{{c.ColumnCreationOptions}}</td>
-      <td>&nbsp</td>
+      <td class="text-center">
+        <button
+          ng-if="!columnAlreadyStagedForDrop($index)"
+          ng-click="dropColumnFromSchema($index)"
+        type="button"
+        class="btn btn-danger">Drop</button>
+        <button
+          ng-if="columnAlreadyStagedForDrop($index)"
+          ng-click="undoDropColumnFromSchema($index)"
+        type="button"
+        class="btn btn-info">Undo Drop</button>
+      </td>
     </tr>
     <tr ng-repeat="c in additions.Columns">
       <td>{{c.InboundName}}</td>

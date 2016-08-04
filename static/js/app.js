@@ -166,6 +166,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       }
       $scope.schema = schema;
       $scope.additions = {Columns: [], EventName: schema.EventName}; // Used to hold new columns
+      $scope.drops = {Columns: [], EventName: schema.EventName}; // Used to hold dropped columns
       $scope.types = types;
       $scope.newCol = ColumnMaker.make();
       $scope.addColumnToSchema = function(column) {
@@ -187,6 +188,18 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         $scope.additions.Columns.push(column);
         $scope.newCol = ColumnMaker.make();
         document.getElementById('newInboundName').focus()
+      };
+      $scope.columnAlreadyStagedForDrop = function(colInd) {
+        alert($scope.schema.Columns[colInd])
+        console.log("hi")
+      };
+      $scope.dropColumnFromSchema = function(colInd) {
+        alert($scope.schema.Columns[colInd])
+        console.log("hi")
+      };
+      $scope.undoDropColumnFromSchema = function(colInd) {
+        alert($scope.schema.Columns[colInd])
+        console.log("hi")
       };
       $scope.dropColumnFromAdditions = function(colInd) {
         $scope.additions.Columns.splice(colInd, 1);
