@@ -190,16 +190,16 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         document.getElementById('newInboundName').focus()
       };
       $scope.columnAlreadyStagedForDrop = function(colInd) {
-        if ($scope.drops.ColInds.indexOf(colInd) < 0) return false
-        return true
+        if ($scope.drops.ColInds.indexOf(colInd) < 0) return false;
+        return true;
       };
       $scope.dropColumnFromSchema = function(colInd) {
-        $scope.drops.ColInds.push(colInd)
+        $scope.drops.ColInds.push(colInd);
       };
       $scope.undoDropColumnFromSchema = function(colInd) {
-        undoTarget = $scope.drops.ColInds.indexOf(colInd)
+        undoTarget = $scope.drops.ColInds.indexOf(colInd);
         // can only undo drop a column that was already dropped
-        if (undoTarget < 0) return
+        if (undoTarget < 0) return;
         $scope.drops.ColInds.splice(undoTarget, 1);
       };
       $scope.dropColumnFromAdditions = function(colInd) {
@@ -207,9 +207,9 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       };
       $scope.updateSchema = function() {
         var additions = $scope.additions;
-        var drops = []
+        var drops = [];
         for (i = 0; i < $scope.drops.ColInds.length; i++) {
-          drops.push($scope.schema.Columns[$scope.drops.ColInds[i]])
+          drops.push($scope.schema.Columns[$scope.drops.ColInds[i]]);
         }
         if (additions.Columns.length + drops.length < 1) {
           store.setError("No change to columns, so no action taken.", undefined);
