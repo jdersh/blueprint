@@ -20,13 +20,13 @@
       <td class="text-center">{{c.ColumnCreationOptions}}</td>
       <td class="text-center">
         <button
-          ng-if="!columnAlreadyStagedForDrop($index)"
-          ng-click="dropColumnFromSchema($index)"
+          ng-if="!columnAlreadyStagedForDelete($index)"
+          ng-click="deleteColumnFromSchema($index)"
         type="button"
         class="btn btn-danger">Drop</button>
         <button
-          ng-if="columnAlreadyStagedForDrop($index)"
-          ng-click="undoDropColumnFromSchema($index)"
+          ng-if="columnAlreadyStagedForDelete($index)"
+          ng-click="undoDeleteColumnFromSchema($index)"
         type="button"
         class="btn btn-info">Undo Drop</button>
       </td>
@@ -76,11 +76,12 @@
       </td>
     </tr>
     <tr>
-      <td colspan="4"></td>
+      <td colspan="2"></td>
+      <td class="text-center">Adding {{additions.Columns.length}}</td>
+      <td class="text-center">Dropping {{deletes.ColInds.length}}</td>
       <td class="text-center">
           <button type="submit"
                   class="btn btn-success">Update Schema</button>
-
       </td>
     </tr>
   </tfoot>

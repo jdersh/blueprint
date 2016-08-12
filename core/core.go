@@ -71,5 +71,5 @@ type Column struct {
 type ClientUpdateSchemaRequest struct {
 	EventName string `json:"-"`
 	Additions []Column
-	Drops     []Column
+	Deletes   []Column
 }

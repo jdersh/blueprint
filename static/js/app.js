@@ -166,7 +166,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       }
       $scope.schema = schema;
       $scope.additions = {Columns: []}; // Used to hold new columns
-      $scope.drops = {ColInds: []}; // Used to hold dropped columns
+      $scope.deletes = {ColInds: []}; // Used to hold dropped columns
       $scope.types = types;
       $scope.newCol = ColumnMaker.make();
       $scope.addColumnToSchema = function(column) {
@@ -189,35 +189,35 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         $scope.newCol = ColumnMaker.make();
         document.getElementById('newInboundName').focus()
       };
-      $scope.columnAlreadyStagedForDrop = function(colInd) {
-        if ($scope.drops.ColInds.indexOf(colInd) < 0) return false;
+      $scope.columnAlreadyStagedForDelete = function(colInd) {
+        if ($scope.deletes.ColInds.indexOf(colInd) < 0) return false;
         return true;
       };
-      $scope.dropColumnFromSchema = function(colInd) {
-        $scope.drops.ColInds.push(colInd);
+      $scope.deleteColumnFromSchema = function(colInd) {
+        $scope.deletes.ColInds.push(colInd);
       };
-      $scope.undoDropColumnFromSchema = function(colInd) {
-        undoTarget = $scope.drops.ColInds.indexOf(colInd);
-        // can only undo drop a column that was already dropped
+      $scope.undoDeleteColumnFromSchema = function(colInd) {
+        undoTarget = $scope.deletes.ColInds.indexOf(colInd);
+        // can only undo drop a column that was already deleted
         if (undoTarget < 0) return;
-        $scope.drops.ColInds.splice(undoTarget, 1);
+        $scope.deletes.ColInds.splice(undoTarget, 1);
       };
       $scope.dropColumnFromAdditions = function(colInd) {
         $scope.additions.Columns.splice(colInd, 1);
       };
       $scope.updateSchema = function() {
         var additions = $scope.additions;
-        var drops = [];
-        for (i = 0; i < $scope.drops.ColInds.length; i++) {
-          drops.push($scope.schema.Columns[$scope.drops.ColInds[i]]);
+        var deletes = [];
+        for (i = 0; i < $scope.deletes.ColInds.length; i++) {
+          deletes.push($scope.schema.Columns[$scope.deletes.ColInds[i]]);
         }
-        if (additions.Columns.length + drops.length < 1) {
+        if (additions.Columns.length + deletes.length < 1) {
           store.setError("No change to columns, so no action taken.", undefined);
           return false;
         }
         Schema.update(
           {event: schema.EventName},
-          {additions: additions.Columns, drops: drops},
+          {additions: additions.Columns, deletes: deletes},
           function() {
             store.setMessage("Succesfully updated schema: " +  schema.EventName);
             $location.path('/schema/' + schema.EventName);

@@ -71,6 +71,22 @@ func preValidateSchema(cfg *scoop_protocol.Config) error {
 	return nil
 }
 
+func applyOpsToSchema(schema *scoop_protocol.Config, reqData []core.Column, op string) error {
+	for _, col := range reqData {
+		err := ApplyOperation(schema, Operation{
+			action:        op,
+			inbound:       col.InboundName,
+			outbound:      col.OutboundName,
+			columnType:    col.Transformer,
+			columnOptions: col.Length,
+		})
+		if err != nil {
+			return fmt.Errorf("Error applying operations %s to table: %v", op, err)
+		}
+	}
+	return nil
+}
+
 func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
 	schema, err := bpdb.Schema(req.EventName)
 	if err != nil {
@@ -88,35 +104,19 @@ func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
 			return fmt.Errorf("Column transformer invalid, %v", err)
 		}
 	}
-	for _, col := range req.Additions {
-		err = ApplyOperation(schema, Operation{
-			action:        "add",
-			inbound:       col.InboundName,
-			outbound:      col.OutboundName,
-			columnType:    col.Transformer,
-			columnOptions: col.Length,
-		})
-		if err != nil {
-			return fmt.Errorf("Error applying operations add to table: %v", err)
-		}
+	err = applyOpsToSchema(schema, req.Additions, "add")
+	if err != nil {
+		return err
 	}
 
 	// Validate schema "delete"s
-	for _, col := range req.Drops {
-		err = ApplyOperation(schema, Operation{
-			action:        "delete",
-			inbound:       col.InboundName,
-			outbound:      col.OutboundName,
-			columnType:    col.Transformer,
-			columnOptions: col.Length,
-		})
-		if err != nil {
-			return fmt.Errorf("Error applying operations drop to table: %v", err)
-		}
+	err = applyOpsToSchema(schema, req.Deletes, "delete")
+	if err != nil {
+		return err
 	}
 
 	if len(schema.Columns) > maxColumns {
-		return fmt.Errorf("Too many columns, max is %d, given %d adds and %d drops, which would result in %d total.", maxColumns, len(req.Additions), len(req.Drops), len(schema.Columns))
+		return fmt.Errorf("Too many columns, max is %d, given %d adds and %d deletes, which would result in %d total.", maxColumns, len(req.Additions), len(req.Deletes), len(schema.Columns))
 	}
 	return nil
 }
