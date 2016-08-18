@@ -194,7 +194,6 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         return true;
       };
       $scope.columnIsDeletable = function(colInd) {
-        return true;
         forbiddenDeletes = ['distkey', 'sortkey'];
         options = $scope.schema.Columns[colInd].ColumnCreationOptions;
         for (var i = 0; i < forbiddenDeletes.length; i++) {
