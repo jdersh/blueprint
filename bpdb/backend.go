@@ -66,20 +66,20 @@ func validateIsNotKey(options string) error {
 func preValidateSchema(cfg *scoop_protocol.Config) error {
 	err := validateIdentifier(cfg.EventName)
 	if err != nil {
-		return fmt.Errorf("Event name invalid, %v", err)
+		return fmt.Errorf("event name invalid: %v", err)
 	}
 	for _, col := range cfg.Columns {
 		err = validateIdentifier(col.OutboundName)
 		if err != nil {
-			return fmt.Errorf("Column outbound name invalid, %v", err)
+			return fmt.Errorf("column outbound name invalid: %v", err)
 		}
 		err := validateType(col.Transformer)
 		if err != nil {
-			return fmt.Errorf("Column transformer invalid, %v", err)
+			return fmt.Errorf("column transformer invalid: %v", err)
 		}
 	}
 	if len(cfg.Columns) >= maxColumns {
-		return fmt.Errorf("Too many columns, max is %d, given %d", maxColumns, len(cfg.Columns))
+		return fmt.Errorf("too many columns, max is %d, given %d", maxColumns, len(cfg.Columns))
 	}
 	return nil
 }
@@ -94,7 +94,7 @@ func applyOpsToSchema(schema *scoop_protocol.Config, reqData []core.Column, op s
 			columnOptions: col.Length,
 		})
 		if err != nil {
-			return fmt.Errorf("Error applying operations %s to table: %v", op, err)
+			return fmt.Errorf("error applying operations %s to table: %v", op, err)
 		}
 	}
 	return nil
@@ -103,18 +103,18 @@ func applyOpsToSchema(schema *scoop_protocol.Config, reqData []core.Column, op s
 func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
 	schema, err := bpdb.Schema(req.EventName)
 	if err != nil {
-		return fmt.Errorf("Error getting schema to validate schema update: %v", err)
+		return fmt.Errorf("error getting schema to validate schema update: %v", err)
 	}
 
 	// Validate schema "add"s
 	for _, col := range req.Additions {
 		err = validateIdentifier(col.OutboundName)
 		if err != nil {
-			return fmt.Errorf("Column outbound name invalid, %v", err)
+			return fmt.Errorf("column outbound name invalid: %v", err)
 		}
 		err = validateType(col.Transformer)
 		if err != nil {
-			return fmt.Errorf("Column transformer invalid, %v", err)
+			return fmt.Errorf("column transformer invalid: %v", err)
 		}
 	}
 
@@ -122,7 +122,7 @@ func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
 	for _, col := range req.Deletes {
 		err = validateIsNotKey(col.Length)
 		if err != nil {
-			return fmt.Errorf("Column is a key and cannot be dropped, %v", err)
+			return fmt.Errorf("column is a key and cannot be dropped: %v", err)
 		}
 	}
 
@@ -137,7 +137,7 @@ func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
 	}
 
 	if len(schema.Columns) > maxColumns {
-		return fmt.Errorf("Too many columns, max is %d, given %d adds and %d deletes, which would result in %d total.", maxColumns, len(req.Additions), len(req.Deletes), len(schema.Columns))
+		return fmt.Errorf("too many columns, max is %d, given %d adds and %d deletes, which would result in %d total", maxColumns, len(req.Additions), len(req.Deletes), len(schema.Columns))
 	}
 	return nil
 }
