@@ -230,11 +230,11 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
             store.setMessage("Succesfully updated schema: " +  schema.EventName);
             // update front-end schema
             for (i = 0; i < $scope.deletes.ColInds.length; i++) {
-              $scope.schema.Columns.splice($scope.deletes.ColInds[i], 1)
+              $scope.schema.Columns.splice($scope.deletes.ColInds[i], 1);
             }
             $scope.deletes = {ColInds: []};
             for (i = 0; i < $scope.additions.Columns.length; i++) {
-              $scope.schema.Columns.push($scope.additions.Columns[i])
+              $scope.schema.Columns.push($scope.additions.Columns[i]);
             }
             $scope.additions = {Columns: []};
             $location.path('/schema/' + schema.EventName);
