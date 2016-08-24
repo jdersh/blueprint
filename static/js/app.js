@@ -135,7 +135,8 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       $location.path('/');
     });
   })
-  .controller('SchemaShowCtrl', function ($scope, $location, $routeParams, $q, store, Schema, Types, ColumnMaker) {
+  .controller('SchemaShowCtrl', function ($scope, $location, $routeParams, $q, $log, store, Schema, Types, ColumnMaker) {
+    //TODO remove log
     var types, schema;
     var typeRequest = Types.get(function(data) {
       if (data) {
@@ -167,12 +168,16 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       $scope.schema = schema;
       $scope.additions = {Columns: []}; // Used to hold new columns
       $scope.deletes = {ColInds: []}; // Used to hold dropped columns
+      $scope.renames = {}; // Used to hold renamed columns {originalName: newName, ...}
+      angular.forEach($scope.schema.Columns, function(col, i){
+        $scope.renames[col.OutboundName] = col.OutboundName;
+      });
       $scope.types = types;
       $scope.newCol = ColumnMaker.make();
       $scope.addColumnToSchema = function(column) {
         if (!ColumnMaker.validate(column)) {
           store.setError("New column is invalid", undefined);
-          return false
+          return false;
         }
         store.clearError();
         if (column.Transformer === 'varchar') {
@@ -213,19 +218,47 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       $scope.dropColumnFromAdditions = function(colInd) {
         $scope.additions.Columns.splice(colInd, 1);
       };
+      $scope.outboundColumnEdited = function(originalName){
+        return $scope.renames[originalName] != originalName;
+      }
+      $scope.outboundColumnStyle = function(originalName){
+        if($scope.outboundColumnEdited(originalName)){
+          return "warning"
+        }
+        return ""
+      }
+      $scope.undoRename = function(originalName){
+        $scope.renames[originalName] = originalName;
+      }
+      $scope.numRenames = function(){
+        var i = 0;
+        angular.forEach($scope.renames, function(val, originalName){
+          if($scope.outboundColumnEdited(originalName)){
+            i++;
+          }
+        });
+        return i;
+      }
       $scope.updateSchema = function() {
         var additions = $scope.additions;
         var deletes = [];
-        for (i = 0; i < $scope.deletes.ColInds.length; i++) {
-          deletes.push($scope.schema.Columns[$scope.deletes.ColInds[i]].OutboundName);
-        }
-        if (additions.Columns.length + deletes.length < 1) {
+        angular.forEach($scope.deletes.ColInds, function(colIndex) {
+          deletes.push($scope.schema.Columns[colIndex].OutboundName);
+        });
+        var onlyChangedRenames = {};
+        angular.forEach($scope.renames, function(newName, originalName){
+          if(newName != originalName){
+              onlyChangedRenames[originalName] = newName;
+          }
+        });
+
+        if (additions.Columns.length + deletes.length + onlyChangedRenames.length < 1) {
           store.setError("No change to columns, so no action taken.", undefined);
           return false;
         }
         Schema.update(
           {event: schema.EventName},
-          {additions: additions.Columns, deletes: deletes},
+          {additions: additions.Columns, deletes: deletes, renames: onlyChangedRenames},
           function() {
             store.setMessage("Succesfully updated schema: " +  schema.EventName);
             // update front-end schema

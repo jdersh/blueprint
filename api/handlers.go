@@ -219,7 +219,6 @@ func (s *server) isBlacklisted(name string) (bool, error) {
 }
 
 func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
-	// TODO: when refactoring the front end do not send the event name (should be inferred from URL)
 	eventName := c.URLParams["id"]
 
 	defer func() {

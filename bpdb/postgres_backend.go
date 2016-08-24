@@ -30,7 +30,7 @@ SELECT action, name, action_metadata
 FROM operation
 WHERE version = $1
 AND event = $2
-ORDER BY version ASC, ordering ASC
+ORDER BY ordering ASC
 `
 	addColumnQuery = `INSERT INTO operation
 (event, action, name, version, ordering, action_metadata)
@@ -55,6 +55,14 @@ type operationRow struct {
 	ordering       int
 }
 
+// metadataAddMarshaller is used to marshal into json the metadata for an add
+// operation
+type metadataAddMarshaller struct {
+	Inbound       string `json:"inbound"`
+	ColumnType    string `json:"column_type"`
+	ColumnOptions string `json:"column_options"`
+}
+
 // NewPostgresBackend creates a postgres bpdb backend to interface with
 // the schema store
 func NewPostgresBackend(dbConnection string) (Bpdb, error) {
@@ -70,6 +78,7 @@ func NewPostgresBackend(dbConnection string) (Bpdb, error) {
 	return b, nil
 }
 
+// Migration returns the operations necessary to migration `table` from version `to -1` to version `to`
 func (p *postgresBackend) Migration(table string, to int) ([]*scoop_protocol.Operation, error) {
 	rows, err := p.db.Query(migrationQuery, to, table)
 	if err != nil {
@@ -99,56 +108,8 @@ func (p *postgresBackend) Migration(table string, to int) ([]*scoop_protocol.Ope
 	return ops, nil
 }
 
-func execAddColumns(reqEvent string, reqData []core.Column, tx *sql.Tx, newVersion int, additionOffset int) error {
-	for i, col := range reqData {
-		metadata := metadataMarshaller{
-			Inbound:       col.InboundName,
-			ColumnType:    col.Transformer,
-			ColumnOptions: col.Length,
-		}
-		b, err := json.Marshal(metadata)
-		if err != nil {
-			return fmt.Errorf("Error marshalling add column metadata json: %v", err)
-		}
-		_, err = tx.Exec(addColumnQuery,
-			reqEvent,
-			"add",
-			col.OutboundName,
-			newVersion,
-			additionOffset+i,
-			b,
-		)
-		if err != nil {
-			rollErr := tx.Rollback()
-			if rollErr != nil {
-				return fmt.Errorf("Error rolling back commit: %v.", rollErr)
-			}
-			return fmt.Errorf("Error INSERTing row for add column on %s: %v", reqEvent, err)
-		}
-	}
-	return nil
-}
-func execDeleteColumns(reqEvent string, deletes []string, tx *sql.Tx, newVersion int, additionOffset int) error {
-	for i, col := range deletes {
-		_, err := tx.Exec(addColumnQuery,
-			reqEvent,
-			"delete",
-			col,
-			newVersion,
-			additionOffset+i,
-			"{}",
-		)
-		if err != nil {
-			rollErr := tx.Rollback()
-			if rollErr != nil {
-				return fmt.Errorf("Error rolling back commit: %v.", rollErr)
-			}
-			return fmt.Errorf("Error INSERTing row for delete column on %s: %v", reqEvent, err)
-		}
-	}
-	return nil
-}
-
+// UpdateSchema validates that the update operation is valid and if so, stores
+// the operations for this migration to the schema as operations in bpdb
 func (p *postgresBackend) UpdateSchema(req *core.ClientUpdateSchemaRequest) error {
 	err := preValidateUpdate(req, p)
 	if err != nil {
@@ -167,14 +128,28 @@ func (p *postgresBackend) UpdateSchema(req *core.ClientUpdateSchemaRequest) erro
 		return fmt.Errorf("Error parsing response for version number for %s: %v.", req.EventName, err)
 	}
 
-	err = execAddColumns(req.EventName, req.Additions, tx, newVersion, 0)
-	if err != nil {
-		return err
-	}
-
-	err = execDeleteColumns(req.EventName, req.Deletes, tx, newVersion, len(req.Additions))
-	if err != nil {
-		return err
+	ops := requestToOps(req)
+	for i, op := range ops {
+		var b []byte
+		b, err = json.Marshal(op.ActionMetadata)
+		if err != nil {
+			return fmt.Errorf("Error marshalling %s column metadata json: %v", op.Action, err)
+		}
+		_, err = tx.Exec(addColumnQuery,
+			req.EventName,
+			op.Action,
+			op.Name,
+			newVersion,
+			i,
+			b,
+		)
+		if err != nil {
+			rollErr := tx.Rollback()
+			if rollErr != nil {
+				return fmt.Errorf("Error rolling back commit: %v.", rollErr)
+			}
+			return fmt.Errorf("Error INSERTing row for delete column on %s: %v", req.EventName, err)
+		}
 	}
 
 	err = tx.Commit()
@@ -184,12 +159,8 @@ func (p *postgresBackend) UpdateSchema(req *core.ClientUpdateSchemaRequest) erro
 	return nil
 }
 
-type metadataMarshaller struct {
-	Inbound       string `json:"inbound"`
-	ColumnType    string `json:"column_type"`
-	ColumnOptions string `json:"column_options"`
-}
-
+// CreateSchema validates that the creation operation is valid and if so, stores
+// the schema as 'add' operations in bpdb
 func (p *postgresBackend) CreateSchema(req *scoop_protocol.Config) error {
 	err := preValidateSchema(req)
 	if err != nil {
@@ -202,7 +173,7 @@ func (p *postgresBackend) CreateSchema(req *scoop_protocol.Config) error {
 	}
 
 	for i, col := range req.Columns {
-		metadata := metadataMarshaller{
+		metadata := metadataAddMarshaller{
 			Inbound:       col.InboundName,
 			ColumnType:    col.Transformer,
 			ColumnOptions: col.ColumnCreationOptions,

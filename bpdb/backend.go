@@ -74,9 +74,9 @@ func preValidateSchema(cfg *scoop_protocol.Config) error {
 	return nil
 }
 
+// requestToOps converts a schema update request into a list of operations
 func requestToOps(req *core.ClientUpdateSchemaRequest) []scoop_protocol.Operation {
-	ops := make([]scoop_protocol.Operation, len(req.Additions)+len(req.Deletes))
-	i := 0
+	ops := make([]scoop_protocol.Operation, len(req.Additions)+len(req.Deletes)+len(req.Renames))
 	for i, col := range req.Additions {
 		ops[i] = scoop_protocol.Operation{
 			Action: "add",
@@ -89,11 +89,22 @@ func requestToOps(req *core.ClientUpdateSchemaRequest) []scoop_protocol.Operatio
 		}
 	}
 	for j, colName := range req.Deletes {
-		ops[i+j] = scoop_protocol.Operation{
+		ops[len(req.Additions)+j] = scoop_protocol.Operation{
 			Action:         "delete",
 			Name:           colName,
 			ActionMetadata: map[string]string{},
 		}
+	}
+	k := 0
+	for oldName, newName := range req.Renames {
+		ops[len(req.Additions)+len(req.Deletes)+k] = scoop_protocol.Operation{
+			Action: "rename",
+			Name:   oldName,
+			ActionMetadata: map[string]string{
+				"new_outbound": newName,
+			},
+		}
+		k++
 	}
 	return ops
 }
@@ -102,6 +113,14 @@ func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
 	schema, err := bpdb.Schema(req.EventName)
 	if err != nil {
 		return fmt.Errorf("error getting schema to validate schema update: %v", err)
+	}
+
+	// Validate schema "rename"s
+	for _, newName := range req.Renames {
+		err = validateIdentifier(newName)
+		if err != nil {
+			return fmt.Errorf("New name for column is invalid: %v", err)
+		}
 	}
 
 	// Validate schema "add"s

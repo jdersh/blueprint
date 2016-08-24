@@ -43,6 +43,14 @@ func ApplyOperation(s *scoop_protocol.Config, op scoop_protocol.Operation) error
 			}
 		}
 		return fmt.Errorf("Outbound column '%s' does not exists in schema, cannot drop non-existing column.", op.Name)
+	case "rename":
+		for i, existingCol := range s.Columns {
+			if existingCol.OutboundName == op.Name {
+				s.Columns[i].OutboundName = op.ActionMetadata["new_outbound"]
+				return nil
+			}
+		}
+		return fmt.Errorf("Outbound column '%s' does not exists in schema, cannot rename non-existent column.", op.Name)
 	default:
 		return fmt.Errorf("Error, unsupported operation action %s.", op.Action)
 	}
