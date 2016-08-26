@@ -23,19 +23,11 @@ type Config struct {
 	Version   int
 }
 
-type Action string
-
-const (
-	ADD Action = "add"
-)
-
 // Operation represents a single change to a schema
 type Operation struct {
-	Action        Action
-	Inbound       string
-	Outbound      string
-	ColumnType    string
-	ColumnOptions string
+	Action         string
+	Name           string
+	ActionMetadata map[string]string
 }
 
 type RowCopyRequest struct {
