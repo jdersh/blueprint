@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 
+	"encoding/json"
+
 	"github.com/lib/pq"
 	"github.com/twitchscience/blueprint/core"
 	"github.com/twitchscience/scoop_protocol/scoop_protocol"
@@ -13,26 +15,26 @@ import (
 
 var (
 	schemaQuery = `
-SELECT event, action, inbound, outbound, column_type, column_options, version, ordering
+SELECT event, action, name, version, ordering, action_metadata
 FROM operation
 WHERE event = $1
 ORDER BY version ASC, ordering ASC
 `
 	allSchemasQuery = `
-SELECT event, action, inbound, outbound, column_type, column_options, version, ordering
+SELECT event, action, name,  version, ordering, action_metadata
 FROM operation
 ORDER BY version ASC, ordering ASC
 `
 	migrationQuery = `
-SELECT action, inbound, outbound, column_type, column_options
+SELECT action, name, action_metadata
 FROM operation
 WHERE version = $1
 AND event = $2
 ORDER BY version ASC, ordering ASC
 `
 	addColumnQuery = `INSERT INTO operation
-(event, action, inbound, outbound, column_type, column_options, version, ordering)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+(event, action, name, version, ordering, action_metadata)
+VALUES ($1, $2, $3, $4, $5, $6)
 `
 	nextVersionQuery = `SELECT max(version) + 1
 FROM operation
@@ -45,14 +47,12 @@ type postgresBackend struct {
 }
 
 type operationRow struct {
-	event         string
-	action        string
-	inbound       string
-	outbound      string
-	columnType    string
-	columnOptions string
-	version       int
-	ordering      int
+	event          string
+	action         string
+	name           string
+	actionMetadata map[string]string
+	version        int
+	ordering       int
 }
 
 // NewPostgresBackend creates a postgres bpdb backend to interface with
@@ -84,36 +84,66 @@ func (p *postgresBackend) Migration(table string, to int) ([]*scoop_protocol.Ope
 	}()
 	for rows.Next() {
 		var op scoop_protocol.Operation
-		var action string
-		err := rows.Scan(&action, &op.Inbound, &op.Outbound, &op.ColumnType, &op.ColumnOptions)
+		var b []byte
+		err := rows.Scan(&op.Action, &op.Name, &b)
 		if err != nil {
-			return nil, fmt.Errorf("Error parsing operation row: %v.", err)
+			return nil, fmt.Errorf("Error parsing row into Operation: %v.", err)
 		}
-		op.Action = scoop_protocol.Action(action)
 
+		err = json.Unmarshal(b, &op.ActionMetadata)
+		if err != nil {
+			return nil, fmt.Errorf("Error unmarshalling action_metadata: %v.", err)
+		}
 		ops = append(ops, &op)
 	}
 	return ops, nil
 }
 
-func execAddColumns(reqEvent string, reqData []core.Column, tx *sql.Tx, newVersion int, op string, additionOffset int) error {
+func execAddColumns(reqEvent string, reqData []core.Column, tx *sql.Tx, newVersion int, additionOffset int) error {
 	for i, col := range reqData {
-		_, err := tx.Exec(addColumnQuery,
+		metadata := metadataAdd{
+			Inbound:       col.InboundName,
+			ColumnType:    col.Transformer,
+			ColumnOptions: col.Length,
+		}
+		b, err := json.Marshal(metadata)
+		if err != nil {
+			return fmt.Errorf("Error marshalling add column metadata json: %v", err)
+		}
+		_, err = tx.Exec(addColumnQuery,
 			reqEvent,
-			op,
-			col.InboundName,
+			"add",
 			col.OutboundName,
-			col.Transformer,
-			col.Length,
 			newVersion,
 			additionOffset+i,
+			b,
 		)
 		if err != nil {
 			rollErr := tx.Rollback()
 			if rollErr != nil {
 				return fmt.Errorf("Error rolling back commit: %v.", rollErr)
 			}
-			return fmt.Errorf("Error INSERTing row for %s column on %s: %v", op, reqEvent, err)
+			return fmt.Errorf("Error INSERTing row for add column on %s: %v", reqEvent, err)
+		}
+	}
+	return nil
+}
+func execDeleteColumns(reqEvent string, deletes []string, tx *sql.Tx, newVersion int, additionOffset int) error {
+	for i, col := range deletes {
+		_, err := tx.Exec(addColumnQuery,
+			reqEvent,
+			"delete",
+			col,
+			newVersion,
+			additionOffset+i,
+			"{}",
+		)
+		if err != nil {
+			rollErr := tx.Rollback()
+			if rollErr != nil {
+				return fmt.Errorf("Error rolling back commit: %v.", rollErr)
+			}
+			return fmt.Errorf("Error INSERTing row for delete column on %s: %v", reqEvent, err)
 		}
 	}
 	return nil
@@ -137,12 +167,12 @@ func (p *postgresBackend) UpdateSchema(req *core.ClientUpdateSchemaRequest) erro
 		return fmt.Errorf("Error parsing response for version number for %s: %v.", req.EventName, err)
 	}
 
-	err = execAddColumns(req.EventName, req.Additions, tx, newVersion, "add", 0)
+	err = execAddColumns(req.EventName, req.Additions, tx, newVersion, 0)
 	if err != nil {
 		return err
 	}
 
-	err = execAddColumns(req.EventName, req.Deletes, tx, newVersion, "delete", len(req.Additions))
+	err = execDeleteColumns(req.EventName, req.Deletes, tx, newVersion, len(req.Additions))
 	if err != nil {
 		return err
 	}
@@ -152,6 +182,12 @@ func (p *postgresBackend) UpdateSchema(req *core.ClientUpdateSchemaRequest) erro
 		return fmt.Errorf("Error commiting schema update for %s: %v", req.EventName, err)
 	}
 	return nil
+}
+
+type metadataAdd struct {
+	Inbound       string `json:"inbound"`
+	ColumnType    string `json:"column_type"`
+	ColumnOptions string `json:"column_options"`
 }
 
 func (p *postgresBackend) CreateSchema(req *scoop_protocol.Config) error {
@@ -166,14 +202,23 @@ func (p *postgresBackend) CreateSchema(req *scoop_protocol.Config) error {
 	}
 
 	for i, col := range req.Columns {
+		metadata := metadataAdd{
+			Inbound:       col.InboundName,
+			ColumnType:    col.Transformer,
+			ColumnOptions: col.ColumnCreationOptions,
+		}
+		var b []byte
+		b, err = json.Marshal(metadata)
+		if err != nil {
+			return fmt.Errorf("Error marshalling metadata json")
+		}
+
 		_, err = tx.Exec(addColumnQuery,
 			req.EventName,
 			"add",
-			col.InboundName,
 			col.OutboundName,
-			col.Transformer,
-			col.ColumnCreationOptions,
-			0,
+			b,
+			0, // version = 0 since new schema
 			i,
 		)
 		if err != nil {
@@ -207,11 +252,15 @@ func scanOperationRows(rows *sql.Rows) ([]operationRow, error) {
 	}()
 	for rows.Next() {
 		var op operationRow
-		err := rows.Scan(&op.event, &op.action, &op.inbound, &op.outbound, &op.columnType, &op.columnOptions, &op.version, &op.ordering)
+		var b []byte
+		err := rows.Scan(&op.event, &op.action, &op.name, &op.version, &op.ordering, &b)
 		if err != nil {
 			return nil, fmt.Errorf("Error parsing operation row: %v.", err)
 		}
-
+		err = json.Unmarshal(b, &op.actionMetadata)
+		if err != nil {
+			return nil, fmt.Errorf("Error unmarshalling action_metadata: %v.", err)
+		}
 		ops = append(ops, op)
 	}
 	return ops, nil
@@ -271,12 +320,10 @@ func generateSchemas(ops []operationRow) ([]scoop_protocol.Config, error) {
 		if !exists {
 			schemas[op.event] = &scoop_protocol.Config{EventName: op.event}
 		}
-		err := ApplyOperation(schemas[op.event], Operation{
-			action:        op.action,
-			inbound:       op.inbound,
-			outbound:      op.outbound,
-			columnType:    op.columnType,
-			columnOptions: op.columnOptions,
+		err := ApplyOperation(schemas[op.event], scoop_protocol.Operation{
+			Action:         op.action,
+			ActionMetadata: op.actionMetadata,
+			Name:           op.name,
 		})
 		if err != nil {
 			return []scoop_protocol.Config{}, fmt.Errorf("Error applying operation to schema: %v", err)

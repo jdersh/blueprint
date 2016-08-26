@@ -10,20 +10,10 @@ import (
 	"github.com/twitchscience/scoop_protocol/transformer"
 )
 
-// redshiftReservedWords from http://docs.aws.amazon.com/redshift/latest/dg/r_pg_keywords.html
 var (
 	maxColumns = 300
 	keyNames   = []string{"distkey", "sortkey"}
 )
-
-// Operation represents a single change to a schema
-type Operation struct {
-	action        string
-	inbound       string
-	outbound      string
-	columnType    string
-	columnOptions string
-}
 
 // Bpdb is the interface of the blueprint db backend that stores schema state
 type Bpdb interface {
@@ -84,20 +74,28 @@ func preValidateSchema(cfg *scoop_protocol.Config) error {
 	return nil
 }
 
-func applyOpsToSchema(schema *scoop_protocol.Config, reqData []core.Column, op string) error {
-	for _, col := range reqData {
-		err := ApplyOperation(schema, Operation{
-			action:        op,
-			inbound:       col.InboundName,
-			outbound:      col.OutboundName,
-			columnType:    col.Transformer,
-			columnOptions: col.Length,
-		})
-		if err != nil {
-			return fmt.Errorf("error applying operations %s to table: %v", op, err)
+func requestToOps(req *core.ClientUpdateSchemaRequest) []scoop_protocol.Operation {
+	ops := make([]scoop_protocol.Operation, len(req.Additions)+len(req.Deletes))
+	i := 0
+	for i, col := range req.Additions {
+		ops[i] = scoop_protocol.Operation{
+			Action: "add",
+			Name:   col.OutboundName,
+			ActionMetadata: map[string]string{
+				"inbound":        col.InboundName,
+				"column_type":    col.Transformer,
+				"column_options": col.Length,
+			},
 		}
 	}
-	return nil
+	for j, colName := range req.Deletes {
+		ops[i+j] = scoop_protocol.Operation{
+			Action:         "remove",
+			Name:           colName,
+			ActionMetadata: map[string]string{},
+		}
+	}
+	return ops
 }
 
 func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
@@ -119,19 +117,20 @@ func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
 	}
 
 	// Validate schema "delete"s
-	for _, col := range req.Deletes {
-		err = validateIsNotKey(col.Length)
-		if err != nil {
-			return fmt.Errorf("column is a key and cannot be dropped: %v", err)
+	for _, columnName := range req.Deletes {
+		for _, existingCol := range schema.Columns {
+			if existingCol.OutboundName == columnName {
+				err = validateIsNotKey(existingCol.ColumnCreationOptions)
+				if err != nil {
+					return fmt.Errorf("column is a key and cannot be dropped: %v", err)
+				}
+				break // move on to next deleted column
+			}
 		}
 	}
 
-	err = applyOpsToSchema(schema, req.Additions, "add")
-	if err != nil {
-		return err
-	}
-
-	err = applyOpsToSchema(schema, req.Deletes, "delete")
+	ops := requestToOps(req)
+	err = ApplyOperations(schema, ops)
 	if err != nil {
 		return err
 	}
