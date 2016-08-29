@@ -101,7 +101,7 @@ func (p *postgresBackend) Migration(table string, to int) ([]*scoop_protocol.Ope
 
 func execAddColumns(reqEvent string, reqData []core.Column, tx *sql.Tx, newVersion int, additionOffset int) error {
 	for i, col := range reqData {
-		metadata := metadataAdd{
+		metadata := metadataMarshaller{
 			Inbound:       col.InboundName,
 			ColumnType:    col.Transformer,
 			ColumnOptions: col.Length,
@@ -184,7 +184,7 @@ func (p *postgresBackend) UpdateSchema(req *core.ClientUpdateSchemaRequest) erro
 	return nil
 }
 
-type metadataAdd struct {
+type metadataMarshaller struct {
 	Inbound       string `json:"inbound"`
 	ColumnType    string `json:"column_type"`
 	ColumnOptions string `json:"column_options"`
@@ -202,7 +202,7 @@ func (p *postgresBackend) CreateSchema(req *scoop_protocol.Config) error {
 	}
 
 	for i, col := range req.Columns {
-		metadata := metadataAdd{
+		metadata := metadataMarshaller{
 			Inbound:       col.InboundName,
 			ColumnType:    col.Transformer,
 			ColumnOptions: col.ColumnCreationOptions,
