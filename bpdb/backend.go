@@ -90,7 +90,7 @@ func requestToOps(req *core.ClientUpdateSchemaRequest) []scoop_protocol.Operatio
 	}
 	for j, colName := range req.Deletes {
 		ops[i+j] = scoop_protocol.Operation{
-			Action:         "remove",
+			Action:         "delete",
 			Name:           colName,
 			ActionMetadata: map[string]string{},
 		}

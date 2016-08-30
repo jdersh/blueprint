@@ -72,5 +72,4 @@ type ClientUpdateSchemaRequest struct {
 	EventName string `json:"-"`
 	Additions []Column
 	Deletes   []string
-	//todo make client side just send column name to be dropped
 }

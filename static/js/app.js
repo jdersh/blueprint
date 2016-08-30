@@ -217,7 +217,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         var additions = $scope.additions;
         var deletes = [];
         for (i = 0; i < $scope.deletes.ColInds.length; i++) {
-          deletes.push($scope.schema.Columns[$scope.deletes.ColInds[i]]);
+          deletes.push($scope.schema.Columns[$scope.deletes.ColInds[i]].OutboundName);
         }
         if (additions.Columns.length + deletes.length < 1) {
           store.setError("No change to columns, so no action taken.", undefined);
