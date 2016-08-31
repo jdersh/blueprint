@@ -272,6 +272,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
             $scope.deletes = {ColInds: []};
             angular.forEach($scope.additions.Columns, function(c) {
               $scope.schema.Columns.push(c);
+              $scope.renames[c.OutboundName] = c.OutboundName
             });
             $scope.additions = {Columns: []};
             $location.path('/schema/' + schema.EventName);
