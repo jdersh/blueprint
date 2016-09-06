@@ -135,8 +135,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       $location.path('/');
     });
   })
-  .controller('SchemaShowCtrl', function ($scope, $location, $routeParams, $q, $log, store, Schema, Types, ColumnMaker) {
-    //TODO remove log
+  .controller('SchemaShowCtrl', function ($scope, $location, $routeParams, $q, store, Schema, Types, ColumnMaker) {
     var types, schema;
     var typeRequest = Types.get(function(data) {
       if (data) {
@@ -227,6 +226,12 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         }
         return ""
       }
+      $scope.summaryStyle = function(num){
+        if(num > 0){
+          return "warning";
+        }
+        return "";
+      }
       $scope.undoRename = function(originalName){
         $scope.renames[originalName] = originalName;
       }
@@ -246,11 +251,31 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
           deletes.push($scope.schema.Columns[colIndex].OutboundName);
         });
         var onlyChangedRenames = {};
-        angular.forEach($scope.renames, function(newName, originalName){
-          if(newName != originalName){
-              onlyChangedRenames[originalName] = newName;
-          }
+        var nameSet = {};
+        var noErrors = Object.keys($scope.renames).every(function(originalName) {
+              var newName = $scope.renames[originalName];
+
+              if(originalName != newName){
+                onlyChangedRenames[originalName] = newName;
+              }else{
+                return true;
+              }
+
+              if(newName in nameSet) {
+                store.setError("Cannot rename from or to a column that was already renamed from or to. Offending name: " + newName);
+                return false;
+              }
+              if(originalName in nameSet) {
+                store.setError("Cannot rename from or to a column that was already renamed from or to. Offending name: " + originalName);
+                return false;
+              }
+              nameSet[newName] = true;
+              nameSet[originalName] = true;
+              return true;
         });
+        if (!noErrors) {
+          return false;
+        }
 
         if (additions.Columns.length + deletes.length + onlyChangedRenames.length < 1) {
           store.setError("No change to columns, so no action taken.", undefined);
@@ -273,6 +298,10 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
             angular.forEach($scope.additions.Columns, function(c) {
               $scope.schema.Columns.push(c);
               $scope.renames[c.OutboundName] = c.OutboundName
+            });
+            angular.forEach(onlyChangedRenames, function(newName, originalName) {
+              delete $scope.renames[originalName];
+              $scope.renames[newName] = newName;
             });
             $scope.additions = {Columns: []};
             $location.path('/schema/' + schema.EventName);

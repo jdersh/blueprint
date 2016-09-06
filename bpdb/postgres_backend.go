@@ -109,7 +109,8 @@ func (p *postgresBackend) Migration(table string, to int) ([]*scoop_protocol.Ope
 }
 
 // UpdateSchema validates that the update operation is valid and if so, stores
-// the operations for this migration to the schema as operations in bpdb
+// the operations for this migration to the schema as operations in bpdb. It
+// applies the operations in order of delete, add, then renames.
 func (p *postgresBackend) UpdateSchema(req *core.ClientUpdateSchemaRequest) error {
 	err := preValidateUpdate(req, p)
 	if err != nil {

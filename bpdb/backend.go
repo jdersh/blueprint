@@ -77,8 +77,15 @@ func preValidateSchema(cfg *scoop_protocol.Config) error {
 // requestToOps converts a schema update request into a list of operations
 func requestToOps(req *core.ClientUpdateSchemaRequest) []scoop_protocol.Operation {
 	ops := make([]scoop_protocol.Operation, len(req.Additions)+len(req.Deletes)+len(req.Renames))
-	for i, col := range req.Additions {
+	for i, colName := range req.Deletes {
 		ops[i] = scoop_protocol.Operation{
+			Action:         "delete",
+			Name:           colName,
+			ActionMetadata: map[string]string{},
+		}
+	}
+	for i, col := range req.Additions {
+		ops[len(req.Additions)+i] = scoop_protocol.Operation{
 			Action: "add",
 			Name:   col.OutboundName,
 			ActionMetadata: map[string]string{
@@ -88,23 +95,16 @@ func requestToOps(req *core.ClientUpdateSchemaRequest) []scoop_protocol.Operatio
 			},
 		}
 	}
-	for j, colName := range req.Deletes {
-		ops[len(req.Additions)+j] = scoop_protocol.Operation{
-			Action:         "delete",
-			Name:           colName,
-			ActionMetadata: map[string]string{},
-		}
-	}
-	k := 0
+	j := 0
 	for oldName, newName := range req.Renames {
-		ops[len(req.Additions)+len(req.Deletes)+k] = scoop_protocol.Operation{
+		ops[len(req.Additions)+len(req.Deletes)+j] = scoop_protocol.Operation{
 			Action: "rename",
 			Name:   oldName,
 			ActionMetadata: map[string]string{
 				"new_outbound": newName,
 			},
 		}
-		k++
+		j++
 	}
 	return ops
 }
@@ -115,11 +115,16 @@ func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
 		return fmt.Errorf("error getting schema to validate schema update: %v", err)
 	}
 
-	// Validate schema "rename"s
-	for _, newName := range req.Renames {
-		err = validateIdentifier(newName)
-		if err != nil {
-			return fmt.Errorf("New name for column is invalid: %v", err)
+	// Validate schema "delete"s
+	for _, columnName := range req.Deletes {
+		for _, existingCol := range schema.Columns {
+			if existingCol.OutboundName == columnName {
+				err = validateIsNotKey(existingCol.ColumnCreationOptions)
+				if err != nil {
+					return fmt.Errorf("column is a key and cannot be dropped: %v", err)
+				}
+				break // move on to next deleted column
+			}
 		}
 	}
 
@@ -135,16 +140,19 @@ func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
 		}
 	}
 
-	// Validate schema "delete"s
-	for _, columnName := range req.Deletes {
-		for _, existingCol := range schema.Columns {
-			if existingCol.OutboundName == columnName {
-				err = validateIsNotKey(existingCol.ColumnCreationOptions)
-				if err != nil {
-					return fmt.Errorf("column is a key and cannot be dropped: %v", err)
-				}
-				break // move on to next deleted column
+	// Validate schema "rename"s
+	nameSet := make(map[string]bool)
+	for oldName, newName := range req.Renames {
+		err = validateIdentifier(newName)
+		if err != nil {
+			return fmt.Errorf("New name for column is invalid: %v", err)
+		}
+		for _, name := range []string{oldName, newName} {
+			_, found := nameSet[name]
+			if found {
+				return fmt.Errorf("Cannot rename from or to a column that was already renamed from or to. Offending name: %v", name)
 			}
+			nameSet[name] = true
 		}
 	}
 
