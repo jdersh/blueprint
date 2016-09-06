@@ -23,9 +23,17 @@ type Config struct {
 	Version   int
 }
 
+type Action string
+
+const (
+	ADD    Action = "add"
+	DELETE Action = "delete"
+	RENAME Action = "rename"
+)
+
 // Operation represents a single change to a schema
 type Operation struct {
-	Action         string
+	Action         Action
 	Name           string
 	ActionMetadata map[string]string
 }

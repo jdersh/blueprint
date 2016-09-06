@@ -71,8 +71,6 @@ type Column struct {
 // a set of columns.
 type Renames map[string]string
 
-//TODO should this even be a thing?
-
 // ClientUpdateSchemaRequest is a request to update the schema for an event.
 type ClientUpdateSchemaRequest struct {
 	EventName string `json:"-"`

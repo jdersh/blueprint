@@ -22,7 +22,7 @@ func ApplyOperations(s *scoop_protocol.Config, operations []scoop_protocol.Opera
 // schema to a new state
 func ApplyOperation(s *scoop_protocol.Config, op scoop_protocol.Operation) error {
 	switch op.Action {
-	case "add":
+	case scoop_protocol.ADD:
 		for _, existingCol := range s.Columns {
 			if existingCol.OutboundName == op.Name {
 				return fmt.Errorf("Outbound column '%s' already exists in schema, cannot add again.", op.Name)
@@ -34,7 +34,7 @@ func ApplyOperation(s *scoop_protocol.Config, op scoop_protocol.Operation) error
 			Transformer:           op.ActionMetadata["column_type"],
 			ColumnCreationOptions: op.ActionMetadata["column_options"],
 		})
-	case "delete":
+	case scoop_protocol.DELETE:
 		for i, existingCol := range s.Columns {
 			if existingCol.OutboundName == op.Name {
 				// splice the dropped column away
@@ -43,7 +43,7 @@ func ApplyOperation(s *scoop_protocol.Config, op scoop_protocol.Operation) error
 			}
 		}
 		return fmt.Errorf("Outbound column '%s' does not exists in schema, cannot drop non-existing column.", op.Name)
-	case "rename":
+	case scoop_protocol.RENAME:
 		for i, existingCol := range s.Columns {
 			if existingCol.OutboundName == op.Name {
 				s.Columns[i].OutboundName = op.ActionMetadata["new_outbound"]

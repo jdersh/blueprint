@@ -94,11 +94,13 @@ func (p *postgresBackend) Migration(table string, to int) ([]*scoop_protocol.Ope
 	for rows.Next() {
 		var op scoop_protocol.Operation
 		var b []byte
-		err := rows.Scan(&op.Action, &op.Name, &b)
+		var s string
+		err := rows.Scan(&s, &op.Name, &b)
 		if err != nil {
 			return nil, fmt.Errorf("Error parsing row into Operation: %v.", err)
 		}
 
+		op.Action = scoop_protocol.Action(s)
 		err = json.Unmarshal(b, &op.ActionMetadata)
 		if err != nil {
 			return nil, fmt.Errorf("Error unmarshalling action_metadata: %v.", err)
@@ -138,7 +140,7 @@ func (p *postgresBackend) UpdateSchema(req *core.ClientUpdateSchemaRequest) erro
 		}
 		_, err = tx.Exec(addColumnQuery,
 			req.EventName,
-			op.Action,
+			string(op.Action),
 			op.Name,
 			newVersion,
 			i,
@@ -293,7 +295,7 @@ func generateSchemas(ops []operationRow) ([]scoop_protocol.Config, error) {
 			schemas[op.event] = &scoop_protocol.Config{EventName: op.event}
 		}
 		err := ApplyOperation(schemas[op.event], scoop_protocol.Operation{
-			Action:         op.action,
+			Action:         scoop_protocol.Action(op.action),
 			ActionMetadata: op.actionMetadata,
 			Name:           op.name,
 		})

@@ -79,14 +79,14 @@ func requestToOps(req *core.ClientUpdateSchemaRequest) []scoop_protocol.Operatio
 	ops := make([]scoop_protocol.Operation, len(req.Additions)+len(req.Deletes)+len(req.Renames))
 	for i, colName := range req.Deletes {
 		ops[i] = scoop_protocol.Operation{
-			Action:         "delete",
+			Action:         scoop_protocol.DELETE,
 			Name:           colName,
 			ActionMetadata: map[string]string{},
 		}
 	}
 	for i, col := range req.Additions {
 		ops[len(req.Additions)+i] = scoop_protocol.Operation{
-			Action: "add",
+			Action: scoop_protocol.ADD,
 			Name:   col.OutboundName,
 			ActionMetadata: map[string]string{
 				"inbound":        col.InboundName,
@@ -98,7 +98,7 @@ func requestToOps(req *core.ClientUpdateSchemaRequest) []scoop_protocol.Operatio
 	j := 0
 	for oldName, newName := range req.Renames {
 		ops[len(req.Additions)+len(req.Deletes)+j] = scoop_protocol.Operation{
-			Action: "rename",
+			Action: scoop_protocol.RENAME,
 			Name:   oldName,
 			ActionMetadata: map[string]string{
 				"new_outbound": newName,
