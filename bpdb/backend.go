@@ -74,8 +74,25 @@ func preValidateSchema(cfg *scoop_protocol.Config) error {
 	return nil
 }
 
-// requestToOps converts a schema update request into a list of operations
-func requestToOps(req *core.ClientUpdateSchemaRequest) []scoop_protocol.Operation {
+// schemaCreateRequestToOps converts a schema update request into a list of add operations
+func schemaCreateRequestToOps(req *scoop_protocol.Config) []scoop_protocol.Operation {
+	ops := make([]scoop_protocol.Operation, 0, len(req.Columns))
+	for _, col := range req.Columns {
+		ops = append(ops, scoop_protocol.Operation{
+			Action: scoop_protocol.ADD,
+			Name:   col.OutboundName,
+			ActionMetadata: map[string]string{
+				"inbound":        col.InboundName,
+				"column_type":    col.Transformer,
+				"column_options": col.ColumnCreationOptions,
+			},
+		})
+	}
+	return ops
+}
+
+// schemaUpdateRequestToOps converts a schema update request into a list of operations
+func schemaUpdateRequestToOps(req *core.ClientUpdateSchemaRequest) []scoop_protocol.Operation {
 	ops := make([]scoop_protocol.Operation, 0, len(req.Additions)+len(req.Deletes)+len(req.Renames))
 	for _, colName := range req.Deletes {
 		ops = append(ops, scoop_protocol.Operation{
@@ -154,7 +171,7 @@ func preValidateUpdate(req *core.ClientUpdateSchemaRequest, bpdb Bpdb) error {
 		}
 	}
 
-	ops := requestToOps(req)
+	ops := schemaUpdateRequestToOps(req)
 	err = ApplyOperations(schema, ops)
 	if err != nil {
 		return err

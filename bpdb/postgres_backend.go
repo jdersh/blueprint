@@ -2,13 +2,12 @@ package bpdb
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"log"
 
 	"encoding/json"
 
-	"github.com/lib/pq"
+	_ "github.com/lib/pq" // to include the 'postgres' driver
 	"github.com/twitchscience/blueprint/core"
 	"github.com/twitchscience/scoop_protocol/scoop_protocol"
 )
@@ -32,7 +31,7 @@ WHERE version = $1
 AND event = $2
 ORDER BY ordering ASC
 `
-	addColumnQuery = `INSERT INTO operation
+	insertOperationsQuery = `INSERT INTO operation
 (event, action, name, version, ordering, action_metadata)
 VALUES ($1, $2, $3, $4, $5, $6)
 `
@@ -53,14 +52,6 @@ type operationRow struct {
 	actionMetadata map[string]string
 	version        int
 	ordering       int
-}
-
-// metadataAddMarshaller is used to marshal into json the metadata for an add
-// operation
-type metadataAddMarshaller struct {
-	Inbound       string `json:"inbound"`
-	ColumnType    string `json:"column_type"`
-	ColumnOptions string `json:"column_options"`
 }
 
 // NewPostgresBackend creates a postgres bpdb backend to interface with
@@ -110,54 +101,46 @@ func (p *postgresBackend) Migration(table string, to int) ([]*scoop_protocol.Ope
 	return ops, nil
 }
 
-// UpdateSchema validates that the update operation is valid and if so, stores
-// the operations for this migration to the schema as operations in bpdb. It
-// applies the operations in order of delete, add, then renames.
-func (p *postgresBackend) UpdateSchema(req *core.ClientUpdateSchemaRequest) error {
-	err := preValidateUpdate(req, p)
-	if err != nil {
-		return fmt.Errorf("Invalid schema creation request: %v", err)
-	}
-
+//execFnInTransaction takes a closure function of a request and runs it on the db in a transaction
+func (p *postgresBackend) execFnInTransaction(work func(*sql.Tx) error) error {
 	tx, err := p.db.Begin()
 	if err != nil {
-		return fmt.Errorf("Error beginning transaction for schema update: %v.", err)
+		return err
 	}
-
-	row := tx.QueryRow(nextVersionQuery, req.EventName)
-	var newVersion int
-	err = row.Scan(&newVersion)
+	err = work(tx)
 	if err != nil {
-		return fmt.Errorf("Error parsing response for version number for %s: %v.", req.EventName, err)
+		rollbackErr := tx.Rollback()
+		if rollbackErr != nil {
+			return fmt.Errorf("Could not rollback successfully after error (%v), reason: %v", err, rollbackErr)
+		}
+		return err
 	}
+	return tx.Commit()
+}
 
-	ops := requestToOps(req)
+// returns error but does not rollback on error. Does not commit.
+func insertOperations(tx *sql.Tx, ops []scoop_protocol.Operation, version int, eventName string) error {
 	for i, op := range ops {
 		var b []byte
-		b, err = json.Marshal(op.ActionMetadata)
+		b, err := json.Marshal(op.ActionMetadata)
 		if err != nil {
 			return fmt.Errorf("Error marshalling %s column metadata json: %v", op.Action, err)
 		}
-		_, err = tx.Exec(addColumnQuery,
-			req.EventName,
+		_, err = tx.Exec(insertOperationsQuery,
+			eventName,
 			string(op.Action),
 			op.Name,
-			newVersion,
-			i,
-			b,
+			version,
+			i, // ordering
+			b, // action_metadata
 		)
 		if err != nil {
 			rollErr := tx.Rollback()
 			if rollErr != nil {
 				return fmt.Errorf("Error rolling back commit: %v.", rollErr)
 			}
-			return fmt.Errorf("Error INSERTing row for delete column on %s: %v", req.EventName, err)
+			return fmt.Errorf("Error INSERTing row for delete column on %s: %v", eventName, err)
 		}
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return fmt.Errorf("Error commiting schema update for %s: %v", req.EventName, err)
 	}
 	return nil
 }
@@ -170,49 +153,31 @@ func (p *postgresBackend) CreateSchema(req *scoop_protocol.Config) error {
 		return fmt.Errorf("Invalid schema creation request: %v", err)
 	}
 
-	tx, err := p.db.Begin()
+	ops := schemaCreateRequestToOps(req)
+	return p.execFnInTransaction(func(tx *sql.Tx) error {
+		return insertOperations(tx, ops, 0, req.EventName)
+	})
+}
+
+// UpdateSchema validates that the update operation is valid and if so, stores
+// the operations for this migration to the schema as operations in bpdb. It
+// applies the operations in order of delete, add, then renames.
+func (p *postgresBackend) UpdateSchema(req *core.ClientUpdateSchemaRequest) error {
+	err := preValidateUpdate(req, p)
 	if err != nil {
-		return fmt.Errorf("Error beginning transaction for schema creation: %v.", err)
+		return fmt.Errorf("Invalid schema creation request: %v", err)
 	}
 
-	for i, col := range req.Columns {
-		metadata := metadataAddMarshaller{
-			Inbound:       col.InboundName,
-			ColumnType:    col.Transformer,
-			ColumnOptions: col.ColumnCreationOptions,
-		}
-		var b []byte
-		b, err = json.Marshal(metadata)
+	ops := schemaUpdateRequestToOps(req)
+	return p.execFnInTransaction(func(tx *sql.Tx) error {
+		row := tx.QueryRow(nextVersionQuery, req.EventName)
+		var newVersion int
+		err = row.Scan(&newVersion)
 		if err != nil {
-			return fmt.Errorf("Error marshalling metadata json")
+			return fmt.Errorf("Error parsing response for version number for %s: %v.", req.EventName, err)
 		}
-
-		_, err = tx.Exec(addColumnQuery,
-			req.EventName,
-			"add",
-			col.OutboundName,
-			b,
-			0, // version = 0 since new schema
-			i,
-		)
-		if err != nil {
-			rollErr := tx.Rollback()
-			if rollErr != nil {
-				return fmt.Errorf("Error rolling back commit: %v.", rollErr)
-			}
-			if pqErr, ok := err.(*pq.Error); ok {
-				if pqErr.Code.Name() == "unique_violation" { // pkey violation, meaning table already exists
-					return errors.New("table already exists")
-				}
-			}
-			return fmt.Errorf("Error INSERTing row for new column on %s: %v", req.EventName, err)
-		}
-	}
-	err = tx.Commit()
-	if err != nil {
-		return fmt.Errorf("Error commiting schema creation for %s: %v", req.EventName, err)
-	}
-	return nil
+		return insertOperations(tx, ops, newVersion, req.EventName)
+	})
 }
 
 // scanOperationRows scans the rows into operationRow objects
