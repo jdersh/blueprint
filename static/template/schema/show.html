@@ -16,7 +16,7 @@ Note: any changes will be queued until offpeak hours - Redshift data for this ta
   <tbody>
     <tr ng-repeat="c in schema.Columns">
       <td>{{c.InboundName}}</td>
-      <td ng-class="outboundColumnStyle(c.OutboundName)"><input type="text" ng-model="renames[c.OutboundName]" ng-change="outboundColumnChanged(c.OutboundName)" ng-readonly="columnAlreadyStagedForDelete($index)"> </td>
+      <td ng-class="outboundColumnStyle(c.OutboundName)"><input type="text" ng-model="nameMap[c.OutboundName]" ng-change="outboundColumnChanged(c.OutboundName)" ng-readonly="columnAlreadyStagedForDelete($index)"> </td>
       <td>{{c.Transformer}}</td>
       <td class="text-center">{{c.ColumnCreationOptions}}</td>
       <td class="text-center">

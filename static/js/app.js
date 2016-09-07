@@ -167,9 +167,9 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
       $scope.schema = schema;
       $scope.additions = {Columns: []}; // Used to hold new columns
       $scope.deletes = {ColInds: []}; // Used to hold dropped columns
-      $scope.renames = {}; // Used to hold renamed columns {originalName: newName, ...}
+      $scope.nameMap = {}; // Used to hold renamed columns {originalName: newName, ...}
       angular.forEach($scope.schema.Columns, function(col, i){
-        $scope.renames[col.OutboundName] = col.OutboundName;
+        $scope.nameMap[col.OutboundName] = col.OutboundName;
       });
       $scope.types = types;
       $scope.newCol = ColumnMaker.make();
@@ -218,7 +218,7 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         $scope.additions.Columns.splice(colInd, 1);
       };
       $scope.outboundColumnEdited = function(originalName){
-        return $scope.renames[originalName] != originalName;
+        return $scope.nameMap[originalName] != originalName;
       }
       $scope.outboundColumnStyle = function(originalName){
         if($scope.outboundColumnEdited(originalName)){
@@ -233,11 +233,11 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         return "";
       }
       $scope.undoRename = function(originalName){
-        $scope.renames[originalName] = originalName;
+        $scope.nameMap[originalName] = originalName;
       }
       $scope.numRenames = function(){
         var i = 0;
-        angular.forEach($scope.renames, function(val, originalName){
+        angular.forEach($scope.nameMap, function(val, originalName){
           if($scope.outboundColumnEdited(originalName)){
             i++;
           }
@@ -250,13 +250,13 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
         angular.forEach($scope.deletes.ColInds, function(colIndex) {
           deletes.push($scope.schema.Columns[colIndex].OutboundName);
         });
-        var onlyChangedRenames = {};
+        var renames = {};
         var nameSet = {};
-        var noErrors = Object.keys($scope.renames).every(function(originalName) {
-              var newName = $scope.renames[originalName];
+        var noErrors = Object.keys($scope.nameMap).every(function(originalName) {
+              var newName = $scope.nameMap[originalName];
 
               if(originalName != newName){
-                onlyChangedRenames[originalName] = newName;
+                renames[originalName] = newName;
               }else{
                 return true;
               }
@@ -277,13 +277,13 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
           return false;
         }
 
-        if (additions.Columns.length + deletes.length + onlyChangedRenames.length < 1) {
+        if (additions.Columns.length + deletes.length + renames.length < 1) {
           store.setError("No change to columns, so no action taken.", undefined);
           return false;
         }
         Schema.update(
           {event: schema.EventName},
-          {additions: additions.Columns, deletes: deletes, renames: onlyChangedRenames},
+          {additions: additions.Columns, deletes: deletes, renames: renames},
           function() {
             store.setMessage("Succesfully updated schema: " +  schema.EventName);
             // update front-end schema
@@ -297,11 +297,11 @@ angular.module('blueprint', ['ngResource', 'ngRoute'])
             $scope.deletes = {ColInds: []};
             angular.forEach($scope.additions.Columns, function(c) {
               $scope.schema.Columns.push(c);
-              $scope.renames[c.OutboundName] = c.OutboundName
+              $scope.nameMap[c.OutboundName] = c.OutboundName
             });
-            angular.forEach(onlyChangedRenames, function(newName, originalName) {
-              delete $scope.renames[originalName];
-              $scope.renames[newName] = newName;
+            angular.forEach(renames, function(newName, originalName) {
+              delete $scope.nameMap[originalName];
+              $scope.nameMap[newName] = newName;
             });
             $scope.additions = {Columns: []};
             $location.path('/schema/' + schema.EventName);
