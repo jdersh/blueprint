@@ -76,16 +76,16 @@ func preValidateSchema(cfg *scoop_protocol.Config) error {
 
 // requestToOps converts a schema update request into a list of operations
 func requestToOps(req *core.ClientUpdateSchemaRequest) []scoop_protocol.Operation {
-	ops := make([]scoop_protocol.Operation, len(req.Additions)+len(req.Deletes)+len(req.Renames))
-	for i, colName := range req.Deletes {
-		ops[i] = scoop_protocol.Operation{
+	ops := make([]scoop_protocol.Operation, 0, len(req.Additions)+len(req.Deletes)+len(req.Renames))
+	for _, colName := range req.Deletes {
+		ops = append(ops, scoop_protocol.Operation{
 			Action:         scoop_protocol.DELETE,
 			Name:           colName,
 			ActionMetadata: map[string]string{},
-		}
+		})
 	}
-	for i, col := range req.Additions {
-		ops[len(req.Additions)+i] = scoop_protocol.Operation{
+	for _, col := range req.Additions {
+		ops = append(ops, scoop_protocol.Operation{
 			Action: scoop_protocol.ADD,
 			Name:   col.OutboundName,
 			ActionMetadata: map[string]string{
@@ -93,18 +93,16 @@ func requestToOps(req *core.ClientUpdateSchemaRequest) []scoop_protocol.Operatio
 				"column_type":    col.Transformer,
 				"column_options": col.Length,
 			},
-		}
+		})
 	}
-	j := 0
 	for oldName, newName := range req.Renames {
-		ops[len(req.Additions)+len(req.Deletes)+j] = scoop_protocol.Operation{
+		ops = append(ops, scoop_protocol.Operation{
 			Action: scoop_protocol.RENAME,
 			Name:   oldName,
 			ActionMetadata: map[string]string{
 				"new_outbound": newName,
 			},
-		}
-		j++
+		})
 	}
 	return ops
 }
