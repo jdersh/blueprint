@@ -95,31 +95,13 @@ func schemaCreateRequestToOps(req *scoop_protocol.Config) []scoop_protocol.Opera
 func schemaUpdateRequestToOps(req *core.ClientUpdateSchemaRequest) []scoop_protocol.Operation {
 	ops := make([]scoop_protocol.Operation, 0, len(req.Additions)+len(req.Deletes)+len(req.Renames))
 	for _, colName := range req.Deletes {
-		ops = append(ops, scoop_protocol.Operation{
-			Action:         scoop_protocol.DELETE,
-			Name:           colName,
-			ActionMetadata: map[string]string{},
-		})
+		ops = append(ops, scoop_protocol.NewDeleteOperation(colName))
 	}
 	for _, col := range req.Additions {
-		ops = append(ops, scoop_protocol.Operation{
-			Action: scoop_protocol.ADD,
-			Name:   col.OutboundName,
-			ActionMetadata: map[string]string{
-				"inbound":        col.InboundName,
-				"column_type":    col.Transformer,
-				"column_options": col.Length,
-			},
-		})
+		ops = append(ops, scoop_protocol.NewAddOperation(col.OutboundName, col.InboundName, col.Transformer, col.Length))
 	}
 	for oldName, newName := range req.Renames {
-		ops = append(ops, scoop_protocol.Operation{
-			Action: scoop_protocol.RENAME,
-			Name:   oldName,
-			ActionMetadata: map[string]string{
-				"new_outbound": newName,
-			},
-		})
+		ops = append(ops, scoop_protocol.NewRenameOperation(oldName, newName))
 	}
 	return ops
 }

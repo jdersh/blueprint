@@ -38,6 +38,34 @@ type Operation struct {
 	ActionMetadata map[string]string
 }
 
+func NewAddOperation(outbound, inbound, type_, options string) Operation {
+	return Operation{
+		Action: ADD,
+		Name:   outbound,
+		ActionMetadata: map[string]string{
+			"inbound":        inbound,
+			"column_type":    type_,
+			"column_options": options,
+		},
+	}
+}
+func NewDeleteOperation(outbound string) Operation {
+	return Operation{
+		Action:         DELETE,
+		Name:           outbound,
+		ActionMetadata: map[string]string{},
+	}
+}
+func NewRenameOperation(current, new string) Operation {
+	return Operation{
+		Action: RENAME,
+		Name:   current,
+		ActionMetadata: map[string]string{
+			"new_outbound": new,
+		},
+	}
+}
+
 type RowCopyRequest struct {
 	KeyName      string
 	TableName    string
