@@ -78,15 +78,7 @@ func preValidateSchema(cfg *scoop_protocol.Config) error {
 func schemaCreateRequestToOps(req *scoop_protocol.Config) []scoop_protocol.Operation {
 	ops := make([]scoop_protocol.Operation, 0, len(req.Columns))
 	for _, col := range req.Columns {
-		ops = append(ops, scoop_protocol.Operation{
-			Action: scoop_protocol.ADD,
-			Name:   col.OutboundName,
-			ActionMetadata: map[string]string{
-				"inbound":        col.InboundName,
-				"column_type":    col.Transformer,
-				"column_options": col.ColumnCreationOptions,
-			},
-		})
+		ops = append(ops, scoop_protocol.NewAddOperation(col.OutboundName, col.InboundName, col.Transformer, col.ColumnCreationOptions))
 	}
 	return ops
 }
