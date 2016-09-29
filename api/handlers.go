@@ -155,13 +155,18 @@ func (s *server) createSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("%v is blacklisted", cfg.EventName), http.StatusForbidden)
 		return
 	}
-	a := auth.New(githubServer,
-		clientID,
-		clientSecret,
-		cookieSecret,
-		requiredOrg,
-		loginURL)
-	user := a.User(r).Name
+	var user string
+	if enableAuth {
+		a := auth.New(githubServer,
+			clientID,
+			clientSecret,
+			cookieSecret,
+			requiredOrg,
+			loginURL)
+		user = a.User(r).Name
+	} else {
+		user = "unknown"
+	}
 
 	err = s.bpdbBackend.CreateSchema(&cfg, user)
 	if err != nil {
@@ -251,13 +256,18 @@ func (s *server) updateSchema(c web.C, w http.ResponseWriter, r *http.Request) {
 	}
 	req.EventName = eventName
 
-	a := auth.New(githubServer,
-		clientID,
-		clientSecret,
-		cookieSecret,
-		requiredOrg,
-		loginURL)
-	user := a.User(r).Name
+	var user string
+	if enableAuth {
+		a := auth.New(githubServer,
+			clientID,
+			clientSecret,
+			cookieSecret,
+			requiredOrg,
+			loginURL)
+		user = a.User(r).Name
+	} else {
+		user = "unknown"
+	}
 
 	err = s.bpdbBackend.UpdateSchema(&req, user)
 	if err != nil {
