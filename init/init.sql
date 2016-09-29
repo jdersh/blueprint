@@ -13,5 +13,6 @@ CREATE TABLE IF NOT EXISTS operation
   version int,
   ordering int,
   ts timestamp without time zone default NOW(),
+  user_name varchar,
   PRIMARY KEY (event, version, ordering)
 );
